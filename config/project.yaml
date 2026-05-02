@@ -1,0 +1,14 @@
+project: bankcap
+status: scaffold
+primary_question: "Which banks can absorb Treasury debt, and do their deposits, loans, funding, and liquidity buffers respond differently?"
+first_milestone: h8_bank_group_screen
+reuse_first:
+  - buycurve
+  - tdcladder
+  - liqsub
+  - tdcest
+  - tdcpass
+claim_boundary:
+  - H.8 bank-group evidence is mechanism context, not bank-level identification.
+  - Bank-level claims require Call Report or FR Y-9C data discipline.
+  - Public aggregates may mix Treasury and agency securities.
