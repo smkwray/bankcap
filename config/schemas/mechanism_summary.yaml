@@ -1,0 +1,36 @@
+name: h8_mechanism_summary
+version: 1
+format: json
+claim_boundary: >-
+  The mechanism summary is a machine-readable index of the H.8 bank-group screen. It summarizes
+  descriptive mechanism context only and must keep bank-level ingestion blocked unless a separate
+  design memo changes the project scope.
+required_keys:
+  - package
+  - recommendation
+  - claim_boundary
+  - gate_checks
+  - common_target_sample
+  - bank_group_coverage
+  - relative_stability
+  - relative_cutoff_sensitivity
+  - event_window_inventory
+  - bank_level_ingestion
+required_nested_keys:
+  common_target_sample:
+    - rows
+    - periods
+    - first_period
+    - last_period
+    - context_complete_share
+    - coupon_heavy_rows
+    - high_bill_share_rows
+    - low_bill_share_rows
+  relative_stability:
+    - stable_level_contrasts
+    - total_level_contrasts
+    - loan_growth_signs_stable
+    - read
+  bank_level_ingestion:
+    - status
+    - reason

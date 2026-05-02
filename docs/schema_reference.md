@@ -38,3 +38,18 @@ Core columns:
 Primary key: `period`, `bank_group`.
 
 The analysis panel is the H.8 panel plus Treasury context and `is_context_complete`.
+
+## H.8 mechanism summary
+
+Format: JSON.
+
+Required top-level keys:
+
+- `package`, `recommendation`, `claim_boundary`, and `gate_checks`;
+- `common_target_sample` and `bank_group_coverage`;
+- `relative_stability` and `relative_cutoff_sensitivity`;
+- `event_window_inventory`;
+- `bank_level_ingestion`.
+
+The summary must keep `bank_level_ingestion.status` equal to `blocked` unless a separate design memo
+changes the project scope.

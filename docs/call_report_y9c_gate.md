@@ -2,6 +2,10 @@
 
 Bank-level data are justified only after the H.8 go/no-go report is promising.
 
+Current status: the completed H.8 mechanism package does not clear this gate. The project remains
+at H.8 bank-group mechanism context because fixed coupon-heavy support is absent in the common
+target-group sample and relative-bucket stability is mixed.
+
 ## Minimum evidence before bank-level ingestion
 
 The H.8 screen should show most of the following:

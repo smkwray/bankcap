@@ -28,6 +28,39 @@ from bankcap.reporting import (
 )
 from bankcap.treasury_context import build_treasury_context
 
+SUMMARY_REQUIRED_KEYS = {
+    "package",
+    "recommendation",
+    "claim_boundary",
+    "gate_checks",
+    "common_target_sample",
+    "bank_group_coverage",
+    "relative_stability",
+    "relative_cutoff_sensitivity",
+    "event_window_inventory",
+    "bank_level_ingestion",
+}
+
+SUMMARY_REQUIRED_NESTED_KEYS = {
+    "common_target_sample": {
+        "rows",
+        "periods",
+        "first_period",
+        "last_period",
+        "context_complete_share",
+        "coupon_heavy_rows",
+        "high_bill_share_rows",
+        "low_bill_share_rows",
+    },
+    "relative_stability": {
+        "stable_level_contrasts",
+        "total_level_contrasts",
+        "loan_growth_signs_stable",
+        "read",
+    },
+    "bank_level_ingestion": {"status", "reason"},
+}
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -333,6 +366,25 @@ def _validate_mechanism_package_manifest(
             except json.JSONDecodeError as exc:
                 issues.append(f"row {idx} summary is not valid JSON: {path_text} ({exc.msg})")
                 continue
+            if not isinstance(summary, dict):
+                issues.append(f"row {idx} summary is not a JSON object: {path_text}")
+                continue
+            missing_summary_keys = SUMMARY_REQUIRED_KEYS.difference(summary)
+            if missing_summary_keys:
+                issues.append(
+                    f"row {idx} summary missing keys: {', '.join(sorted(missing_summary_keys))}"
+                )
+            for parent, required_keys in SUMMARY_REQUIRED_NESTED_KEYS.items():
+                nested = summary.get(parent)
+                if not isinstance(nested, dict):
+                    issues.append(f"row {idx} summary key '{parent}' is not an object: {path_text}")
+                    continue
+                missing_nested = required_keys.difference(nested)
+                if missing_nested:
+                    issues.append(
+                        f"row {idx} summary key '{parent}' missing keys: "
+                        f"{', '.join(sorted(missing_nested))}"
+                    )
             if not summary.get("claim_boundary"):
                 issues.append(f"row {idx} summary is missing claim_boundary: {path_text}")
             if summary.get("bank_level_ingestion", {}).get("status") != "blocked":

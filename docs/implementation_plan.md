@@ -43,8 +43,11 @@
 - Write the H.8 go/no-go report.
 - Decide whether there is enough evidence for a bank-level design memo.
 - If yes, draft the Call Report / FR Y-9C memo before downloading new bank-level data.
+- Status: complete. The current package is partial go for H.8 mechanism context only; bank-level
+  ingestion remains blocked.
 
 ## Tranche 6: Optional comparison anchors
 
 - Import `tdcest` or `tdcpass` only if the H.8 result needs quarterly TDC/pass-through comparison.
 - Keep these anchors separate from the first-pass H.8 mechanism screen.
+- Status: not needed for the completed H.8 mechanism package.

@@ -262,3 +262,34 @@ def test_cli_validate_mechanism_package_rejects_invalid_summary_json(tmp_path):
     )
     rc = main(["validate-mechanism-package", "--manifest", str(manifest), "--project-root", str(tmp_path)])
     assert rc == 1
+
+
+def test_cli_validate_mechanism_package_rejects_incomplete_summary_json(tmp_path):
+    report = tmp_path / "report.md"
+    report.write_text("## Claim boundary\nThis is not bank-level evidence.\n")
+    panel = tmp_path / "panel.csv"
+    panel.write_text("period,bank_group\n2023-01,large_domestic_banks\n")
+    diagnostic = tmp_path / "diagnostic.csv"
+    diagnostic.write_text("x\n1\n")
+    figure = tmp_path / "figure.svg"
+    figure.write_text("<svg></svg>")
+    summary = tmp_path / "summary.json"
+    summary.write_text(
+        json.dumps(
+            {
+                "claim_boundary": "not bank-level",
+                "bank_level_ingestion": {"status": "blocked"},
+            }
+        )
+    )
+    manifest = tmp_path / "manifest.csv"
+    manifest.write_text(
+        "category,name,path,claim_boundary\n"
+        "input,analysis_panel,panel.csv,H.8 mechanism context only\n"
+        "diagnostic,sample_summary,diagnostic.csv,descriptive only\n"
+        "report,go_no_go_report,report.md,not authorization for bank-level claims\n"
+        "summary,mechanism_summary,summary.json,not bank-level\n"
+        "figure,ratio_trends,figure.svg,visual mechanism context only\n"
+    )
+    rc = main(["validate-mechanism-package", "--manifest", str(manifest), "--project-root", str(tmp_path)])
+    assert rc == 1

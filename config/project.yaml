@@ -1,6 +1,6 @@
 project: bankcap
-version: 0.2.0
-status: seeded_ready
+version: 0.3.0
+status: h8_mechanism_screen_complete
 primary_question: >-
   Which banks can absorb Treasury debt, and do their deposits, loans, funding,
   and liquidity buffers respond differently when Treasury financing is bill-heavy,
@@ -36,6 +36,7 @@ schemas:
   h8_bank_group_outcomes: config/schemas/h8_bank_group_outcomes.yaml
   treasury_context: config/schemas/treasury_context.yaml
   analysis_panel: config/schemas/analysis_panel.yaml
+  mechanism_summary: config/schemas/mechanism_summary.yaml
 thresholds:
   bill_heavy_min_bill_share: 0.60
   coupon_heavy_max_bill_share: 0.40

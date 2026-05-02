@@ -5,6 +5,10 @@ Maturity Capacity, SLR, and Duration Constraints**. The first implementation is 
 low-cost **Federal Reserve H.8 bank-group mechanism screen**, not a Call Report or
 FR Y-9C bank-level project.
 
+Project status: the H.8 mechanism screen is complete as descriptive mechanism context. Current
+outputs support a partial-go package for H.8 evidence only; bank-level ingestion remains blocked.
+See `docs/h8_mechanism_package.md` for the final package status and interpretation boundary.
+
 Core question:
 
 > Which banks can absorb Treasury debt, and do their deposits, loans, funding,
@@ -52,6 +56,7 @@ bankcap/
 │   ├── call_report_y9c_gate.md
 │   ├── cli_reference.md
 │   ├── schema_reference.md
+│   ├── h8_mechanism_package.md
 │   ├── implementation_plan.md
 └── do/                            # local-only planning, ignored by git
     └── IMPLEMENTATION_TRANCHES.md
