@@ -24,6 +24,13 @@ TARGET_H8_GROUPS = {
     "foreign_related_institutions",
 }
 
+LEVEL_OUTCOME_COLUMNS = [
+    "d_securities_usd_millions",
+    "d_deposits_usd_millions",
+    "d_loans_usd_millions",
+    "d_cash_assets_usd_millions",
+]
+
 
 def _target_common_panel(panel: pd.DataFrame) -> pd.DataFrame:
     return target_common_panel(panel)
@@ -98,6 +105,103 @@ def _diagnostic_signal(panel: pd.DataFrame) -> tuple[str, list[str]]:
     return "NO-GO for heavy bank-level ingestion until H.8 coverage/context improves", reasons
 
 
+def _common_sample_row(sample_summary: pd.DataFrame) -> pd.Series | None:
+    if sample_summary.empty:
+        return None
+    required = {"sample", "bank_group"}
+    if not required.issubset(sample_summary.columns):
+        return None
+    common = sample_summary.loc[
+        (sample_summary["sample"] == "common_target_periods")
+        & (sample_summary["bank_group"] == "all_target_groups")
+    ]
+    if common.empty:
+        return None
+    return common.iloc[0]
+
+
+def _coupon_rows_from_summary(panel: pd.DataFrame, sample_summary: pd.DataFrame) -> int:
+    row = _common_sample_row(sample_summary)
+    if row is not None:
+        return int(row.get("coupon_heavy_rows", 0))
+    common = _target_common_panel(panel)
+    return int(
+        common.get("coupon_heavy_month", pd.Series(False, index=common.index))
+        .fillna(False)
+        .astype(bool)
+        .sum()
+    )
+
+
+def _context_share_from_summary(panel: pd.DataFrame, sample_summary: pd.DataFrame) -> float:
+    row = _common_sample_row(sample_summary)
+    if row is not None:
+        return float(row.get("context_complete_share", 0.0))
+    common = _target_common_panel(panel)
+    if common.empty:
+        return 0.0
+    return float(common.get("is_context_complete", pd.Series(False, index=common.index)).mean())
+
+
+def _relative_stability_counts(relative_contrasts: pd.DataFrame) -> tuple[int, int, bool]:
+    if relative_contrasts.empty:
+        return 0, 0, False
+    required = {"sample", "outcome_change", "same_sign_as_other_sample"}
+    if not required.issubset(relative_contrasts.columns):
+        return 0, 0, False
+    common = relative_contrasts.loc[
+        relative_contrasts["sample"].eq("common_target_periods")
+        & relative_contrasts["outcome_change"].isin(LEVEL_OUTCOME_COLUMNS)
+    ]
+    if common.empty:
+        return 0, 0, False
+    stable = int(common["same_sign_as_other_sample"].fillna(False).astype(bool).sum())
+    total = int(len(common))
+    loan_rows = common.loc[common["outcome_change"].eq("d_loans_usd_millions")]
+    loans_stable = bool(len(loan_rows) and loan_rows["same_sign_as_other_sample"].fillna(False).astype(bool).all())
+    return stable, total, loans_stable
+
+
+def _mechanism_recommendation(
+    panel: pd.DataFrame,
+    sample_summary: pd.DataFrame,
+    relative_contrasts: pd.DataFrame,
+) -> tuple[str, list[str]]:
+    recommendation, reasons = _diagnostic_signal(panel)
+    observed_groups = set(panel["bank_group"].dropna().astype(str)) if "bank_group" in panel.columns else set()
+    target_groups = len(observed_groups.intersection(TARGET_H8_GROUPS))
+    if target_groups == 0:
+        return recommendation, reasons
+
+    coupon_rows = _coupon_rows_from_summary(panel, sample_summary)
+    context_share = _context_share_from_summary(panel, sample_summary)
+    stable, total, loans_stable = _relative_stability_counts(relative_contrasts)
+    if total:
+        reasons.extend(
+            [
+                f"relative level contrasts stable across samples: {stable} of {total}",
+                f"relative loan-growth signs stable across target groups: {loans_stable}",
+            ]
+        )
+
+    if coupon_rows < 12:
+        return (
+            "PARTIAL GO: H.8 mechanism context only; fixed bill/coupon support is insufficient",
+            reasons,
+        )
+    if total and stable < total:
+        return (
+            "PARTIAL GO: H.8 mechanism context only; relative-bucket stability is mixed",
+            reasons,
+        )
+    if context_share < 0.75:
+        return (
+            "PARTIAL GO: improve context coverage before Call Report or FR Y-9C ingestion",
+            reasons,
+        )
+    return recommendation, reasons
+
+
 def write_go_no_go_report(
     *,
     panel_path: str | Path,
@@ -107,7 +211,15 @@ def write_go_no_go_report(
     """Write a concise markdown go/no-go report for review."""
 
     panel = read_csv(panel_path)
-    recommendation, reasons = _diagnostic_signal(panel)
+    sample_summary = pd.DataFrame()
+    relative_contrasts = pd.DataFrame()
+    if diagnostics_dir is not None:
+        diag = Path(diagnostics_dir)
+        if (diag / "sample_summary.csv").exists():
+            sample_summary = read_csv(diag / "sample_summary.csv")
+        if (diag / "relative_bill_share_contrasts.csv").exists():
+            relative_contrasts = read_csv(diag / "relative_bill_share_contrasts.csv")
+    recommendation, reasons = _mechanism_recommendation(panel, sample_summary, relative_contrasts)
     out = ensure_parent(output_path)
 
     diagnostics_note = ""
@@ -119,6 +231,23 @@ def write_go_no_go_report(
         )
         if not available:
             diagnostics_note += "- No diagnostic tables found.\n"
+        else:
+            diagnostics_note += "\n"
+
+    stable, total, loans_stable = _relative_stability_counts(relative_contrasts)
+    stability_lines = [
+        f"- fixed-threshold coupon-heavy rows in common target-group sample: {_coupon_rows_from_summary(panel, sample_summary)}",
+        f"- common-sample context-complete row share: {_context_share_from_summary(panel, sample_summary):.2f}",
+    ]
+    if total:
+        stability_lines.extend(
+            [
+                f"- relative high-minus-low level contrasts stable across samples: {stable} of {total}",
+                f"- relative loan-growth signs stable across target groups: {loans_stable}",
+            ]
+        )
+    else:
+        stability_lines.append("- relative high-minus-low stability was not available.")
 
     group_rows = []
     for group, gdf in panel.groupby("bank_group"):
@@ -136,6 +265,10 @@ def write_go_no_go_report(
 
 {chr(10).join(f"- {reason}" for reason in reasons)}
 
+## Stability screen
+
+{chr(10).join(stability_lines)}
+
 ## Bank-group coverage
 
 {chr(10).join(group_rows) if group_rows else "- No bank-group rows found."}
@@ -150,11 +283,10 @@ pre-trend specification.
 {CLAIM_BOUNDARY_TEXT}
 ## Next implementation branch
 
-1. Inspect bill-heavy versus coupon-heavy response tables by bank group.
-2. Check whether securities/deposits, cash/deposits, and loans/deposits move differently across
-   large domestic, small domestic, and foreign-related groups.
-3. Draft a Call Report / FR Y-9C data-cost memo only if the screen shows stable, interpretable
-   variation that is not solely a calendar-regime artifact.
+1. Treat fixed bill/coupon contrasts as unsupported unless coupon-heavy support improves.
+2. Use relative high-bill and low-bill buckets as the current descriptive mechanism screen.
+3. Keep Call Report / FR Y-9C ingestion blocked unless a separate design memo explains why the
+   mixed stability pattern is still worth the bank-level data cost.
 """
     out.write_text(report, encoding="utf-8")
     return out
@@ -301,7 +433,7 @@ def write_mechanism_memo(
         if (diag / "guarded_regressions.csv").exists()
         else pd.DataFrame()
     )
-    recommendation, reasons = _diagnostic_signal(panel)
+    recommendation, reasons = _mechanism_recommendation(panel, sample_summary, relative_contrasts)
     out = ensure_parent(output_path)
 
     common = _target_common_panel(panel)

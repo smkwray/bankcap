@@ -56,6 +56,9 @@ def test_write_go_no_go_report(tmp_path):
     text = report.read_text()
     assert "Claim boundary" in text
     assert "NO-GO" in text or "GO" in text
+    assert "Stability screen" in text
+    assert "fixed bill/coupon support is insufficient" in text
+    assert "Treat fixed bill/coupon contrasts as unsupported" in text
 
 
 def test_write_mechanism_memo(tmp_path):
@@ -72,6 +75,7 @@ def test_write_mechanism_memo(tmp_path):
     assert "Relative high-bill and low-bill" in text
     assert "High-minus-low stability" in text
     assert "Interpretation boundary" in text
+    assert "H.8 mechanism context only" in text
 
 
 def test_write_mechanism_figures(tmp_path):
