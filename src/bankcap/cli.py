@@ -101,6 +101,17 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--diagnostics-dir", default="output/diagnostics")
     p.add_argument("--output-dir", default="output/figures")
 
+    p = sub.add_parser(
+        "write-mechanism-package",
+        help="Run diagnostics and write the guarded H.8 mechanism report, memo, and figures.",
+    )
+    p.add_argument("--panel", default="data/derived/bankcap_analysis_panel.csv")
+    p.add_argument("--diagnostics-dir", default="output/diagnostics")
+    p.add_argument("--report", default="output/reports/h8_go_no_go_report.md")
+    p.add_argument("--memo", default="output/reports/h8_mechanism_screen_memo.md")
+    p.add_argument("--figures-dir", default="output/figures")
+    p.add_argument("--event-window", type=int, default=3)
+
     return parser
 
 
@@ -244,6 +255,34 @@ def main(argv: list[str] | None = None) -> int:
         print("Wrote figures:")
         for name, path in outputs.items():
             print(f"- {name}: {path}")
+        return 0
+    if args.command == "write-mechanism-package":
+        diagnostics = run_first_pass_diagnostics(
+            args.panel,
+            args.diagnostics_dir,
+            event_window=args.event_window,
+        )
+        report = write_go_no_go_report(
+            panel_path=args.panel,
+            diagnostics_dir=args.diagnostics_dir,
+            output_path=args.report,
+        )
+        memo = write_mechanism_memo(
+            panel_path=args.panel,
+            diagnostics_dir=args.diagnostics_dir,
+            output_path=args.memo,
+        )
+        figures = write_mechanism_figures(
+            panel_path=args.panel,
+            diagnostics_dir=args.diagnostics_dir,
+            output_dir=args.figures_dir,
+        )
+        print("Wrote mechanism package:")
+        print(f"- diagnostics: {len(diagnostics)} table(s) in {args.diagnostics_dir}")
+        print(f"- report: {report}")
+        print(f"- memo: {memo}")
+        for name, path in figures.items():
+            print(f"- figure_{name}: {path}")
         return 0
 
     parser.print_help()

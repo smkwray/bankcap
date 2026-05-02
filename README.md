@@ -138,6 +138,14 @@ bankcap write-mechanism-figures \
   --panel data/derived/bankcap_analysis_panel.csv \
   --diagnostics-dir output/diagnostics \
   --output-dir output/figures
+
+# Equivalent post-panel bundle for diagnostics, report, memo, and figures:
+bankcap write-mechanism-package \
+  --panel data/derived/bankcap_analysis_panel.csv \
+  --diagnostics-dir output/diagnostics \
+  --report output/reports/h8_go_no_go_report.md \
+  --memo output/reports/h8_mechanism_screen_memo.md \
+  --figures-dir output/figures
 ```
 
 The H.8 target-group workflow downloads Federal Reserve DDP packages into ignored `data/raw/`,

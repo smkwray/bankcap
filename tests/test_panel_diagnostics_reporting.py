@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from bankcap.cli import main
 from bankcap.diagnostics import run_first_pass_diagnostics
 from bankcap.figures import write_mechanism_figures
 from bankcap.h8 import build_h8_bank_group_panel
@@ -98,3 +99,35 @@ def test_write_mechanism_figures(tmp_path):
         text = path.read_text()
         assert text.startswith("<svg")
         assert "</svg>" in text
+
+
+def test_cli_write_mechanism_package(tmp_path):
+    _, panel_path = _make_panel(tmp_path)
+    diag_dir = tmp_path / "diagnostics"
+    report = tmp_path / "reports" / "go_no_go.md"
+    memo = tmp_path / "reports" / "memo.md"
+    figures_dir = tmp_path / "figures"
+    rc = main(
+        [
+            "write-mechanism-package",
+            "--panel",
+            str(panel_path),
+            "--diagnostics-dir",
+            str(diag_dir),
+            "--report",
+            str(report),
+            "--memo",
+            str(memo),
+            "--figures-dir",
+            str(figures_dir),
+            "--event-window",
+            "1",
+        ]
+    )
+    assert rc == 0
+    assert (diag_dir / "event_window_contrasts.csv").exists()
+    assert (diag_dir / "relative_bill_share_cutoff_sensitivity.csv").exists()
+    assert report.exists()
+    assert memo.exists()
+    assert (figures_dir / "h8_ratio_trends.svg").exists()
+    assert (figures_dir / "relative_bill_share_contrasts.svg").exists()
