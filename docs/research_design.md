@@ -37,7 +37,7 @@ Treasury context:
 
 ## Diagnostics
 
-The seed implements descriptive diagnostics only:
+The package implements descriptive diagnostics only:
 
 1. bank-group trend summaries;
 2. bill-heavy versus coupon-heavy response tables;
@@ -50,5 +50,5 @@ The seed implements descriptive diagnostics only:
 
 A promising H.8 result means the mechanism is worth studying with better data. It does not identify
 individual-bank absorption, bank-level duration constraints, or causal effects. The first report should
-ask whether the pattern is stable enough to justify Call Reports or FR Y-9C, not whether the thesis is
-already proven.
+ask whether the pattern is stable enough to justify Call Reports or FR Y-9C, not whether the evidence
+is strong enough for bank-level interpretation.

@@ -1,9 +1,9 @@
 # bankcap
 
-`bankcap` is the Project 5 workspace for the TDC thesis extension: **Bank-Level
-Maturity Capacity, SLR, and Duration Constraints**. The first implementation is a
-low-cost **Federal Reserve H.8 bank-group mechanism screen**, not a Call Report or
-FR Y-9C bank-level project.
+`bankcap` is a TDC research workspace for **bank-group maturity capacity, SLR, and
+duration-constraint diagnostics**. The first implementation is a low-cost
+**Federal Reserve H.8 bank-group mechanism screen**, not a Call Report or FR Y-9C
+bank-level project.
 
 Project status: the H.8 mechanism screen is complete as descriptive mechanism context. Current
 outputs support a partial-go package for H.8 evidence only; bank-level ingestion remains blocked.
@@ -15,7 +15,7 @@ Core question:
 > and liquidity buffers respond differently when Treasury financing is bill-heavy,
 > coupon-heavy, or concentrated in TGA rebuild/QT/high-rate episodes?
 
-## What this seed includes
+## Repository layout
 
 ```text
 bankcap/
@@ -33,7 +33,8 @@ bankcap/
 │   └── schemas/
 │       ├── h8_bank_group_outcomes.yaml
 │       ├── treasury_context.yaml
-│       └── analysis_panel.yaml
+│       ├── analysis_panel.yaml
+│       └── mechanism_summary.yaml
 ├── src/bankcap/
 │   ├── cli.py
 │   ├── config.py
@@ -57,9 +58,7 @@ bankcap/
 │   ├── cli_reference.md
 │   ├── schema_reference.md
 │   ├── h8_mechanism_package.md
-│   ├── implementation_plan.md
-└── do/                            # local-only planning, ignored by git
-    └── IMPLEMENTATION_TRANCHES.md
+│   └── implementation_plan.md
 ```
 
 The repository intentionally excludes raw data and generated bulk outputs. Local imports from sibling
@@ -98,7 +97,7 @@ bankcap copy-sibling-outputs --sibling tdcladder --source-root "$TDCLADDER_ROOT"
 bankcap copy-sibling-outputs --sibling liqsub --source-root "$LIQSUB_ROOT" --required-only --manifest data/imported/liqsub_manifest.csv
 ```
 
-Build the seed panels:
+Build the panels:
 
 ```bash
 bankcap download-h8-target-groups \

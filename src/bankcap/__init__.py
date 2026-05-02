@@ -1,4 +1,4 @@
-"""Bank-group balance-sheet capacity diagnostics for the TDC thesis extension."""
+"""Bank-group balance-sheet capacity diagnostics for TDC research."""
 
 from __future__ import annotations
 

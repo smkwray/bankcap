@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "bankcap"
 version = "0.3.0"
-description = "Bank-group balance-sheet capacity and Treasury absorption diagnostics for the TDC thesis extension."
+description = "Bank-group balance-sheet capacity and Treasury absorption diagnostics for TDC research."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
