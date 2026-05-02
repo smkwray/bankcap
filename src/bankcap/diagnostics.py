@@ -47,6 +47,13 @@ RELATIVE_BUCKET_SENSITIVITY_GRID = [
     (0.33, 0.67),
 ]
 
+LEVEL_OUTCOME_COLUMNS = [
+    "d_securities_usd_millions",
+    "d_deposits_usd_millions",
+    "d_loans_usd_millions",
+    "d_cash_assets_usd_millions",
+]
+
 
 def bank_group_trends(panel: pd.DataFrame) -> pd.DataFrame:
     """Summarize levels and sample coverage by H.8 bank group."""
@@ -489,12 +496,72 @@ def event_window_table(panel: pd.DataFrame, *, window: int = 3) -> pd.DataFrame:
                         "event_flag": flag,
                         "bank_group": group,
                         "event_number": event_number,
+                        "event_start_period": gdf.iloc[start_idx]["period"],
                         "relative_period": rel,
                         "period": row["period"],
                     }
                     for outcome in outcomes:
                         record[outcome] = row[outcome]
                     rows.append(record)
+    return pd.DataFrame(rows)
+
+
+def event_window_summary_table(events: pd.DataFrame) -> pd.DataFrame:
+    """Summarize event-window changes into pre/start/post phase means."""
+
+    if events.empty:
+        return pd.DataFrame(columns=["event_flag", "bank_group", "event_phase", "n_rows", "n_events"])
+    df = events.copy()
+    df["event_phase"] = "event_start"
+    df.loc[df["relative_period"] < 0, "event_phase"] = "pre_window"
+    df.loc[df["relative_period"] > 0, "event_phase"] = "post_window"
+    value_cols = [c for c in OUTCOME_CHANGE_COLUMNS if c in df.columns]
+    grouped = df.groupby(["event_flag", "bank_group", "event_phase"], as_index=False)
+    means = grouped[value_cols].mean() if value_cols else grouped.size()
+    counts = grouped.agg(
+        n_rows=("period", "size"),
+        n_events=("event_number", "nunique"),
+        first_event_start_period=("event_start_period", "min"),
+        last_event_start_period=("event_start_period", "max"),
+    )
+    out = counts.merge(means, on=["event_flag", "bank_group", "event_phase"], how="left")
+    out["claim_warning"] = "descriptive calendar-window screen; not causal event-study evidence"
+    return out
+
+
+def event_window_contrast_table(summary: pd.DataFrame) -> pd.DataFrame:
+    """Compute event-start and post-window minus pre-window descriptive contrasts."""
+
+    rows: list[dict[str, object]] = []
+    if summary.empty:
+        return pd.DataFrame(rows)
+    value_cols = [c for c in LEVEL_OUTCOME_COLUMNS if c in summary.columns]
+    for (flag, group), gdf in summary.groupby(["event_flag", "bank_group"]):
+        pre = gdf.loc[gdf["event_phase"].eq("pre_window")]
+        if pre.empty:
+            continue
+        pre_row = pre.iloc[0]
+        for phase in ["event_start", "post_window"]:
+            phase_rows = gdf.loc[gdf["event_phase"].eq(phase)]
+            if phase_rows.empty:
+                continue
+            phase_row = phase_rows.iloc[0]
+            for outcome in value_cols:
+                rows.append(
+                    {
+                        "event_flag": flag,
+                        "bank_group": group,
+                        "contrast": f"{phase}_minus_pre_window",
+                        "outcome_change": outcome,
+                        "phase_mean": float(phase_row[outcome]),
+                        "pre_window_mean": float(pre_row[outcome]),
+                        "difference": float(phase_row[outcome] - pre_row[outcome]),
+                        "phase_n_rows": int(phase_row["n_rows"]),
+                        "pre_n_rows": int(pre_row["n_rows"]),
+                        "n_events": int(phase_row["n_events"]),
+                        "claim_warning": "descriptive calendar-window contrast; not causal event-study evidence",
+                    }
+                )
     return pd.DataFrame(rows)
 
 
@@ -526,6 +593,8 @@ def run_first_pass_diagnostics(
         "correlations": out_dir / "correlations.csv",
         "guarded_regressions": out_dir / "guarded_regressions.csv",
         "event_windows": out_dir / "event_windows.csv",
+        "event_window_summary": out_dir / "event_window_summary.csv",
+        "event_window_contrasts": out_dir / "event_window_contrasts.csv",
     }
     write_csv(sample_summary_table(panel), outputs["sample_summary"])
     write_csv(bank_group_trends(panel), outputs["bank_group_trends"])
@@ -541,5 +610,9 @@ def run_first_pass_diagnostics(
     write_csv(relative_bill_share_cutoff_sensitivity_table(panel), outputs["relative_bill_share_cutoff_sensitivity"])
     write_csv(correlation_table(panel), outputs["correlations"])
     write_csv(guarded_regression_table(panel), outputs["guarded_regressions"])
-    write_csv(event_window_table(panel, window=event_window), outputs["event_windows"])
+    events = event_window_table(panel, window=event_window)
+    event_summary = event_window_summary_table(events)
+    write_csv(events, outputs["event_windows"])
+    write_csv(event_summary, outputs["event_window_summary"])
+    write_csv(event_window_contrast_table(event_summary), outputs["event_window_contrasts"])
     return outputs

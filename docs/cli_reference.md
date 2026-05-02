@@ -81,4 +81,5 @@ bankcap write-mechanism-figures
 ```
 
 `run-diagnostics` also writes `relative_bill_share_cutoff_sensitivity.csv`, a descriptive robustness
-screen for nearby relative bill-share cutoffs.
+screen for nearby relative bill-share cutoffs, plus `event_window_summary.csv` and
+`event_window_contrasts.csv` for configured policy/stress windows.

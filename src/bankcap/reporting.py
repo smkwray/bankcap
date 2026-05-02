@@ -403,6 +403,38 @@ def _cutoff_sensitivity_lines(sensitivity: pd.DataFrame) -> list[str]:
     return lines
 
 
+def _event_window_lines(contrasts: pd.DataFrame, *, max_rows_per_event: int = 3) -> list[str]:
+    if contrasts.empty:
+        return ["- No event-window contrast table is available."]
+    required = {"event_flag", "bank_group", "contrast", "outcome_change", "difference", "n_events"}
+    if not required.issubset(contrasts.columns):
+        return ["- Event-window contrast table is missing required columns."]
+    level = contrasts.loc[
+        contrasts["outcome_change"].isin(
+            [
+                "d_securities_usd_millions",
+                "d_deposits_usd_millions",
+                "d_loans_usd_millions",
+                "d_cash_assets_usd_millions",
+            ]
+        )
+    ].copy()
+    if level.empty:
+        return ["- No level-change event-window contrasts are available."]
+    level["abs_difference"] = pd.to_numeric(level["difference"], errors="coerce").abs()
+    lines = []
+    for event_flag, event_rows in level.sort_values("event_flag").groupby("event_flag"):
+        ordered = event_rows.sort_values("abs_difference", ascending=False).head(max_rows_per_event)
+        for _, row in ordered.iterrows():
+            lines.append(
+                "- "
+                f"`{event_flag}` / `{row['bank_group']}` / `{row['contrast']}` "
+                f"`{row['outcome_change']}`: difference={_fmt_number(row['difference'], 1)}, "
+                f"events={int(row.get('n_events', 0))}"
+            )
+    return lines
+
+
 def write_mechanism_memo(
     *,
     panel_path: str | Path,
@@ -453,6 +485,11 @@ def write_mechanism_memo(
     guarded = (
         read_csv(diag / "guarded_regressions.csv")
         if (diag / "guarded_regressions.csv").exists()
+        else pd.DataFrame()
+    )
+    event_contrasts = (
+        read_csv(diag / "event_window_contrasts.csv")
+        if (diag / "event_window_contrasts.csv").exists()
         else pd.DataFrame()
     )
     recommendation, reasons = _mechanism_recommendation(panel, sample_summary, relative_contrasts)
@@ -568,6 +605,13 @@ Relative cutoff sensitivity:
 ## Guarded bill-share screens
 
 {chr(10).join(guarded_lines)}
+
+## Event-window screens
+
+These are descriptive calendar-window contrasts around configured policy/stress windows. They are
+not causal event-study estimates and do not identify bank-level exposure.
+
+{chr(10).join(_event_window_lines(event_contrasts))}
 
 ## Interpretation boundary
 
