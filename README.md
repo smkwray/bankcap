@@ -134,6 +134,11 @@ bankcap write-mechanism-memo \
   --diagnostics-dir output/diagnostics \
   --output output/reports/h8_mechanism_screen_memo.md
 
+bankcap write-mechanism-summary \
+  --panel data/derived/bankcap_analysis_panel.csv \
+  --diagnostics-dir output/diagnostics \
+  --output output/reports/h8_mechanism_summary.json
+
 bankcap write-mechanism-figures \
   --panel data/derived/bankcap_analysis_panel.csv \
   --diagnostics-dir output/diagnostics \
@@ -145,6 +150,7 @@ bankcap write-mechanism-package \
   --diagnostics-dir output/diagnostics \
   --report output/reports/h8_go_no_go_report.md \
   --memo output/reports/h8_mechanism_screen_memo.md \
+  --summary output/reports/h8_mechanism_summary.json \
   --manifest output/reports/h8_mechanism_package_manifest.csv \
   --figures-dir output/figures
 
@@ -161,10 +167,13 @@ bucket tables, write a cutoff-sensitivity table for nearby relative bill-share s
 configured event-window contrasts. The relative buckets are the safer first-pass comparison when
 fixed coupon-heavy months have little or no support.
 
-`write-mechanism-package` also writes `h8_mechanism_package_manifest.csv`, an index of the package
-inputs and outputs with claim-boundary notes. `validate-mechanism-package` checks that the indexed
-artifacts exist, CSVs and SVGs are nonempty/parseable, claim-boundary notes are populated, and
-report text keeps boundary language.
+`write-mechanism-package` also writes `h8_mechanism_summary.json` and
+`h8_mechanism_package_manifest.csv`. The summary is a compact machine-readable readout of the
+screen recommendation, sample coverage, relative-bucket stability, event-window inventory, and
+blocked bank-level ingestion status. The manifest indexes package inputs and outputs with
+claim-boundary notes. `validate-mechanism-package` checks that the indexed artifacts exist, CSVs and
+SVGs are nonempty/parseable, the JSON summary keeps bank-level ingestion blocked, claim-boundary
+notes are populated, and report text keeps boundary language.
 
 ## Required claim boundary
 

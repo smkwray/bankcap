@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -403,6 +404,25 @@ def _cutoff_sensitivity_lines(sensitivity: pd.DataFrame) -> list[str]:
     return lines
 
 
+def _safe_int(value: object) -> int:
+    try:
+        if pd.isna(value):
+            return 0
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _safe_float(value: object) -> float | None:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return None
+    if pd.isna(numeric):
+        return None
+    return numeric
+
+
 def _event_window_lines(contrasts: pd.DataFrame, *, max_rows_per_event: int = 3) -> list[str]:
     if contrasts.empty:
         return ["- No event-window contrast table is available."]
@@ -433,6 +453,129 @@ def _event_window_lines(contrasts: pd.DataFrame, *, max_rows_per_event: int = 3)
                 f"events={int(row.get('n_events', 0))}"
             )
     return lines
+
+
+def write_mechanism_summary_json(
+    *,
+    panel_path: str | Path,
+    diagnostics_dir: str | Path,
+    output_path: str | Path,
+) -> Path:
+    """Write a compact machine-readable summary of the H.8 mechanism package."""
+
+    panel = read_csv(panel_path)
+    diag = Path(diagnostics_dir)
+    sample_summary = read_csv(diag / "sample_summary.csv") if (diag / "sample_summary.csv").exists() else pd.DataFrame()
+    relative_contrasts = (
+        read_csv(diag / "relative_bill_share_contrasts.csv")
+        if (diag / "relative_bill_share_contrasts.csv").exists()
+        else pd.DataFrame()
+    )
+    cutoff_sensitivity = (
+        read_csv(diag / "relative_bill_share_cutoff_sensitivity.csv")
+        if (diag / "relative_bill_share_cutoff_sensitivity.csv").exists()
+        else pd.DataFrame()
+    )
+    event_summary = (
+        read_csv(diag / "event_window_summary.csv")
+        if (diag / "event_window_summary.csv").exists()
+        else pd.DataFrame()
+    )
+
+    recommendation, reasons = _mechanism_recommendation(panel, sample_summary, relative_contrasts)
+    common = _target_common_panel(panel)
+    stable, total, loans_stable = _relative_stability_counts(relative_contrasts)
+    common_row = _common_sample_row(sample_summary)
+    if common_row is not None:
+        common_periods = _safe_int(common_row.get("n_periods"))
+        first_period = str(common_row.get("first_period", ""))
+        last_period = str(common_row.get("last_period", ""))
+    else:
+        common_periods = int(common["period"].nunique()) if len(common) else 0
+        first_period = str(common["period"].min()) if len(common) else ""
+        last_period = str(common["period"].max()) if len(common) else ""
+    common_summary = {
+        "rows": _safe_int(common_row.get("n_rows")) if common_row is not None else len(common),
+        "periods": common_periods,
+        "first_period": first_period,
+        "last_period": last_period,
+        "context_complete_share": _context_share_from_summary(panel, sample_summary),
+        "coupon_heavy_rows": _coupon_rows_from_summary(panel, sample_summary),
+        "high_bill_share_rows": _safe_int(common_row.get("high_bill_share_rows")) if common_row is not None else 0,
+        "low_bill_share_rows": _safe_int(common_row.get("low_bill_share_rows")) if common_row is not None else 0,
+    }
+
+    coverage = []
+    for group, gdf in panel.sort_values(["bank_group", "period"]).groupby("bank_group"):
+        coverage.append(
+            {
+                "bank_group": group,
+                "rows": int(len(gdf)),
+                "first_period": str(gdf["period"].min()),
+                "last_period": str(gdf["period"].max()),
+            }
+        )
+
+    cutoff_rows = []
+    cutoff_source = (
+        cutoff_sensitivity.sort_values(["low_quantile", "high_quantile"]).iterrows()
+        if not cutoff_sensitivity.empty
+        else []
+    )
+    for _, row in cutoff_source:
+        cutoff_rows.append(
+            {
+                "low_quantile": _safe_float(row.get("low_quantile")),
+                "high_quantile": _safe_float(row.get("high_quantile")),
+                "common_high_rows": _safe_int(row.get("common_high_rows")),
+                "common_low_rows": _safe_int(row.get("common_low_rows")),
+                "stable_level_contrasts": _safe_int(row.get("stable_level_contrasts")),
+                "total_level_contrasts": _safe_int(row.get("total_level_contrasts")),
+                "loan_growth_signs_stable": bool(row.get("loan_growth_signs_stable", False)),
+            }
+        )
+
+    event_rows = []
+    if not event_summary.empty:
+        for event_flag, gdf in event_summary.groupby("event_flag"):
+            event_rows.append(
+                {
+                    "event_flag": event_flag,
+                    "bank_groups": sorted(gdf["bank_group"].dropna().astype(str).unique().tolist()),
+                    "n_events": int(gdf["n_events"].max()) if "n_events" in gdf else 0,
+                    "first_event_start_period": str(gdf["first_event_start_period"].min())
+                    if "first_event_start_period" in gdf
+                    else "",
+                    "last_event_start_period": str(gdf["last_event_start_period"].max())
+                    if "last_event_start_period" in gdf
+                    else "",
+                }
+            )
+
+    summary = {
+        "package": "bankcap_h8_mechanism_screen",
+        "recommendation": recommendation,
+        "claim_boundary": "H.8 bank-group evidence is mechanism context, not bank-level identification or causal absorption evidence.",
+        "gate_checks": reasons,
+        "common_target_sample": common_summary,
+        "bank_group_coverage": coverage,
+        "relative_stability": {
+            "stable_level_contrasts": stable,
+            "total_level_contrasts": total,
+            "loan_growth_signs_stable": loans_stable,
+            "read": _relative_stability_read(relative_contrasts),
+        },
+        "relative_cutoff_sensitivity": cutoff_rows,
+        "event_window_inventory": event_rows,
+        "bank_level_ingestion": {
+            "status": "blocked",
+            "reason": "Requires a separate design memo because H.8 stability remains mixed.",
+        },
+    }
+
+    out = ensure_parent(output_path)
+    out.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return out
 
 
 def write_mechanism_memo(

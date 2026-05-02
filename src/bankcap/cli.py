@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 from pathlib import Path
 
 from bankcap import __version__
@@ -20,7 +21,11 @@ from bankcap.h8 import build_h8_bank_group_panel
 from bankcap.h8_ddp import build_target_group_h8_input, download_target_group_packages
 from bankcap.io import ensure_parent
 from bankcap.panel import build_analysis_panel
-from bankcap.reporting import write_go_no_go_report, write_mechanism_memo
+from bankcap.reporting import (
+    write_go_no_go_report,
+    write_mechanism_memo,
+    write_mechanism_summary_json,
+)
 from bankcap.treasury_context import build_treasury_context
 
 
@@ -103,6 +108,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--diagnostics-dir", default="output/diagnostics")
     p.add_argument("--output-dir", default="output/figures")
 
+    p = sub.add_parser("write-mechanism-summary", help="Write a JSON H.8 mechanism-screen summary.")
+    p.add_argument("--panel", default="data/derived/bankcap_analysis_panel.csv")
+    p.add_argument("--diagnostics-dir", default="output/diagnostics")
+    p.add_argument("--output", default="output/reports/h8_mechanism_summary.json")
+
     p = sub.add_parser(
         "write-mechanism-package",
         help="Run diagnostics and write the guarded H.8 mechanism report, memo, and figures.",
@@ -111,6 +121,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--diagnostics-dir", default="output/diagnostics")
     p.add_argument("--report", default="output/reports/h8_go_no_go_report.md")
     p.add_argument("--memo", default="output/reports/h8_mechanism_screen_memo.md")
+    p.add_argument("--summary", default="output/reports/h8_mechanism_summary.json")
     p.add_argument("--figures-dir", default="output/figures")
     p.add_argument("--manifest", default="output/reports/h8_mechanism_package_manifest.csv")
     p.add_argument("--event-window", type=int, default=3)
@@ -186,6 +197,7 @@ def _write_mechanism_package_manifest(
     diagnostics: dict[str, Path],
     report_path: Path,
     memo_path: Path,
+    summary_path: Path,
     figures: dict[str, Path],
     manifest_path: str | Path,
 ) -> Path:
@@ -220,6 +232,12 @@ def _write_mechanism_package_manifest(
                 "name": "mechanism_memo",
                 "path": str(memo_path),
                 "claim_boundary": "descriptive mechanism memo; not bank-level identification",
+            },
+            {
+                "category": "summary",
+                "name": "mechanism_summary",
+                "path": str(summary_path),
+                "claim_boundary": "machine-readable mechanism summary; not bank-level identification",
             },
         ]
     )
@@ -265,7 +283,7 @@ def _validate_mechanism_package_manifest(
         issues.append(f"mechanism package manifest has no artifact rows: {manifest}")
         return issues
 
-    expected_categories = {"input", "diagnostic", "report", "figure"}
+    expected_categories = {"input", "diagnostic", "report", "summary", "figure"}
     seen_categories = set()
     seen_names: set[tuple[str, str]] = set()
     for idx, row in enumerate(rows, start=2):
@@ -309,6 +327,16 @@ def _validate_mechanism_package_manifest(
             text = artifact_path.read_text(encoding="utf-8").strip().lower()
             if not text.startswith("<svg") or "</svg>" not in text:
                 issues.append(f"row {idx} figure is not a complete SVG: {path_text}")
+        elif category == "summary":
+            try:
+                summary = json.loads(artifact_path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError as exc:
+                issues.append(f"row {idx} summary is not valid JSON: {path_text} ({exc.msg})")
+                continue
+            if not summary.get("claim_boundary"):
+                issues.append(f"row {idx} summary is missing claim_boundary: {path_text}")
+            if summary.get("bank_level_ingestion", {}).get("status") != "blocked":
+                issues.append(f"row {idx} summary does not keep bank-level ingestion blocked: {path_text}")
         if not claim_boundary:
             issues.append(f"row {idx} has empty claim_boundary")
 
@@ -411,6 +439,14 @@ def main(argv: list[str] | None = None) -> int:
         for name, path in outputs.items():
             print(f"- {name}: {path}")
         return 0
+    if args.command == "write-mechanism-summary":
+        summary = write_mechanism_summary_json(
+            panel_path=args.panel,
+            diagnostics_dir=args.diagnostics_dir,
+            output_path=args.output,
+        )
+        print(f"Wrote summary: {summary}")
+        return 0
     if args.command == "write-mechanism-package":
         diagnostics = run_first_pass_diagnostics(
             args.panel,
@@ -427,6 +463,11 @@ def main(argv: list[str] | None = None) -> int:
             diagnostics_dir=args.diagnostics_dir,
             output_path=args.memo,
         )
+        summary = write_mechanism_summary_json(
+            panel_path=args.panel,
+            diagnostics_dir=args.diagnostics_dir,
+            output_path=args.summary,
+        )
         figures = write_mechanism_figures(
             panel_path=args.panel,
             diagnostics_dir=args.diagnostics_dir,
@@ -437,6 +478,7 @@ def main(argv: list[str] | None = None) -> int:
             diagnostics=diagnostics,
             report_path=report,
             memo_path=memo,
+            summary_path=summary,
             figures=figures,
             manifest_path=args.manifest,
         )
@@ -444,6 +486,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"- diagnostics: {len(diagnostics)} table(s) in {args.diagnostics_dir}")
         print(f"- report: {report}")
         print(f"- memo: {memo}")
+        print(f"- summary: {summary}")
         for name, path in figures.items():
             print(f"- figure_{name}: {path}")
         print(f"- manifest: {manifest}")

@@ -77,6 +77,7 @@ bankcap build-analysis-panel
 bankcap run-diagnostics
 bankcap write-go-no-go-report
 bankcap write-mechanism-memo
+bankcap write-mechanism-summary
 bankcap write-mechanism-figures
 bankcap write-mechanism-package
 bankcap validate-mechanism-package
@@ -86,7 +87,12 @@ bankcap validate-mechanism-package
 screen for nearby relative bill-share cutoffs, plus `event_window_summary.csv` and
 `event_window_contrasts.csv` for configured policy/stress windows.
 
+`write-mechanism-summary` writes `h8_mechanism_summary.json`, a compact machine-readable summary of
+the guarded H.8 mechanism screen. It includes the package recommendation, sample coverage,
+relative-bucket stability, event-window inventory, and blocked bank-level ingestion status.
+
 `write-mechanism-package` is a post-panel convenience wrapper. It reruns diagnostics and writes the
-go/no-go report, mechanism memo, SVG figures, and a package manifest from the same panel.
+go/no-go report, mechanism memo, JSON summary, SVG figures, and a package manifest from the same
+panel.
 `validate-mechanism-package` checks the manifest schema, artifact paths, CSV/SVG integrity,
-claim-boundary notes, and report boundary language.
+JSON summary boundary status, claim-boundary notes, and report boundary language.
