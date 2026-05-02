@@ -20,6 +20,9 @@ def test_build_treasury_context_from_sibling_fixtures(tmp_path):
     assert len(context) == 3
     assert bool(context.loc[context["period"] == "2023-01", "bill_heavy_month"].iloc[0]) is True
     assert bool(context.loc[context["period"] == "2023-02", "coupon_heavy_month"].iloc[0]) is True
+    assert bool(context.loc[context["period"] == "2023-01", "high_bill_share_month"].iloc[0]) is True
+    assert bool(context.loc[context["period"] == "2023-02", "low_bill_share_month"].iloc[0]) is True
+    assert context.loc[context["period"] == "2023-02", "bill_share_bucket"].iloc[0] == "low_bill_share"
     assert bool(context.loc[context["period"] == "2023-03", "banking_stress_2023_window"].iloc[0]) is True
     assert bool(context.loc[context["period"] == "2023-03", "large_tga_rebuild_window"].iloc[0]) is True
     assert context.loc[context["period"] == "2023-03", "qt_qe_regime"].iloc[0] == "QT"

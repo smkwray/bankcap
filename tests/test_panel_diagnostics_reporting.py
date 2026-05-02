@@ -36,6 +36,9 @@ def test_build_analysis_panel_and_diagnostics(tmp_path):
     assert outputs["bank_group_response_table"].read_text().startswith("bank_group")
     assert outputs["common_target_response_table"].exists()
     assert outputs["tga_complete_response_table"].exists()
+    assert outputs["relative_bill_share_response_table"].exists()
+    assert outputs["common_target_relative_bill_share_response_table"].exists()
+    assert outputs["tga_complete_relative_bill_share_response_table"].exists()
     assert outputs["sample_summary"].read_text().startswith("sample")
 
 
@@ -64,4 +67,5 @@ def test_write_mechanism_memo(tmp_path):
     )
     text = memo.read_text()
     assert "H.8 Mechanism-Screen Memo" in text
+    assert "Relative high-bill and low-bill" in text
     assert "Interpretation boundary" in text

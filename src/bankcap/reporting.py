@@ -52,6 +52,30 @@ def _diagnostic_signal(panel: pd.DataFrame) -> tuple[str, list[str]]:
         ).nunique()
         > 1
     )
+    coupon_rows = int(
+        bill_variation_frame.get(
+            "coupon_heavy_month", pd.Series(False, index=bill_variation_frame.index)
+        )
+        .fillna(False)
+        .astype(bool)
+        .sum()
+    )
+    high_bill_rows = int(
+        bill_variation_frame.get(
+            "high_bill_share_month", pd.Series(False, index=bill_variation_frame.index)
+        )
+        .fillna(False)
+        .astype(bool)
+        .sum()
+    )
+    low_bill_rows = int(
+        bill_variation_frame.get(
+            "low_bill_share_month", pd.Series(False, index=bill_variation_frame.index)
+        )
+        .fillna(False)
+        .astype(bool)
+        .sum()
+    )
 
     reasons = [
         f"sample periods: {periods}",
@@ -59,7 +83,10 @@ def _diagnostic_signal(panel: pd.DataFrame) -> tuple[str, list[str]]:
         f"target H.8 groups observed: {target_groups} of {len(TARGET_H8_GROUPS)}",
         f"common target-group periods: {target_common_periods}",
         f"common-sample context-complete row share: {context_complete:.2f}",
-        f"common-sample bill/coupon context variation present: {bill_variation}",
+        f"fixed-threshold bill/coupon variation present: {bill_variation}",
+        f"fixed-threshold coupon-heavy rows: {coupon_rows}",
+        f"relative high-bill rows: {high_bill_rows}",
+        f"relative low-bill rows: {low_bill_rows}",
     ]
     if target_groups == 0:
         reasons.append("current H.8 reuse is aggregate-only; large/small/foreign split is still missing")
@@ -147,13 +174,16 @@ def _response_lines(response: pd.DataFrame, *, max_rows: int | None = None) -> l
     if response.empty:
         return ["- No response table is available."]
     lines = []
-    ordered = response.sort_values(["bank_group", "treasury_context_bucket"])
+    bucket_col = "treasury_context_bucket"
+    if bucket_col not in response.columns and "relative_bill_share_bucket" in response.columns:
+        bucket_col = "relative_bill_share_bucket"
+    ordered = response.sort_values(["bank_group", bucket_col])
     if max_rows is not None:
         ordered = ordered.head(max_rows)
     for _, row in ordered.iterrows():
         lines.append(
             "- "
-            f"`{row['bank_group']}` / `{row['treasury_context_bucket']}`: "
+            f"`{row['bank_group']}` / `{row[bucket_col]}`: "
             f"n={int(row['n_rows'])}, "
             f"d_securities={_fmt_number(row.get('d_securities_usd_millions'), 1)}, "
             f"d_deposits={_fmt_number(row.get('d_deposits_usd_millions'), 1)}, "
@@ -215,6 +245,16 @@ def write_mechanism_memo(
     tga_response = (
         read_csv(diag / "tga_complete_response_table.csv")
         if (diag / "tga_complete_response_table.csv").exists()
+        else pd.DataFrame()
+    )
+    common_relative_response = (
+        read_csv(diag / "common_target_relative_bill_share_response_table.csv")
+        if (diag / "common_target_relative_bill_share_response_table.csv").exists()
+        else pd.DataFrame()
+    )
+    tga_relative_response = (
+        read_csv(diag / "tga_complete_relative_bill_share_response_table.csv")
+        if (diag / "tga_complete_relative_bill_share_response_table.csv").exists()
         else pd.DataFrame()
     )
     trends = read_csv(diag / "bank_group_trends.csv") if (diag / "bank_group_trends.csv").exists() else pd.DataFrame()
@@ -289,6 +329,19 @@ TGA-complete common target-group sample ({tga_period_text}):
 
 {chr(10).join(_response_lines(tga_response))}
 
+## Relative high-bill and low-bill response support
+
+These buckets compare the top and bottom configured bill-share quantiles. They are relative issuance
+composition screens, not pure bill-versus-coupon regimes.
+
+Common target-group sample:
+
+{chr(10).join(_response_lines(common_relative_response))}
+
+TGA-complete common target-group sample ({tga_period_text}):
+
+{chr(10).join(_response_lines(tga_relative_response))}
+
 ## Guarded bill-share screens
 
 {chr(10).join(guarded_lines)}
@@ -302,10 +355,10 @@ Report or FR Y-9C ingestion.
 
 ## Recommended next branch
 
-1. Treat coupon-heavy contrasts as unsupported unless the issuance context definition is revised and
-   produces meaningful coupon-heavy support.
-2. Inspect the TGA-complete rows as a later-sample mechanism check, not a full historical result.
-3. If the pattern remains stable after a defensible context definition, draft a scoped bank-level design memo;
+1. Treat fixed-threshold coupon-heavy contrasts as unsupported under the current data.
+2. Use relative high-bill and low-bill buckets as the defensible first-pass composition comparison.
+3. Inspect the TGA-complete rows as a later-sample mechanism check, not a full historical result.
+4. If the pattern remains stable after a defensible context definition, draft a scoped bank-level design memo;
    otherwise keep `bankcap` as an H.8 mechanism-context project.
 """
     out.write_text(memo, encoding="utf-8")

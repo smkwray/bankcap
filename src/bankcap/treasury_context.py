@@ -109,6 +109,8 @@ BOOL_COLUMNS = [
     "high_rate_regime",
     "bill_heavy_month",
     "coupon_heavy_month",
+    "high_bill_share_month",
+    "low_bill_share_month",
     "slr_relief_window",
     "rate_duration_shock_window",
     "banking_stress_2023_window",
@@ -284,9 +286,28 @@ def _add_derived_context(
     if "bill_share" in out.columns:
         out["bill_heavy_month"] = out["bill_share"] >= bill_cut
         out["coupon_heavy_month"] = out["bill_share"] <= coupon_cut
+        valid_bill_share = out["bill_share"].dropna()
+        if valid_bill_share.empty:
+            out["high_bill_share_month"] = False
+            out["low_bill_share_month"] = False
+            out["bill_share_bucket"] = "missing"
+        else:
+            low_q = float(thresholds.get("low_bill_share_quantile", 0.25))
+            high_q = float(thresholds.get("high_bill_share_quantile", 0.75))
+            low_cut = valid_bill_share.quantile(low_q)
+            high_cut = valid_bill_share.quantile(high_q)
+            out["low_bill_share_month"] = out["bill_share"] <= low_cut
+            out["high_bill_share_month"] = out["bill_share"] >= high_cut
+            out["bill_share_bucket"] = "middle_bill_share"
+            out.loc[out["low_bill_share_month"], "bill_share_bucket"] = "low_bill_share"
+            out.loc[out["high_bill_share_month"], "bill_share_bucket"] = "high_bill_share"
+            out.loc[out["bill_share"].isna(), "bill_share_bucket"] = "missing"
     else:
         out["bill_heavy_month"] = False
         out["coupon_heavy_month"] = False
+        out["high_bill_share_month"] = False
+        out["low_bill_share_month"] = False
+        out["bill_share_bucket"] = "missing"
 
     for column in [
         "slr_relief_window",
@@ -392,6 +413,9 @@ def build_treasury_context(
         "high_rate_regime",
         "bill_heavy_month",
         "coupon_heavy_month",
+        "high_bill_share_month",
+        "low_bill_share_month",
+        "bill_share_bucket",
         "slr_relief_window",
         "rate_duration_shock_window",
         "banking_stress_2023_window",

@@ -91,6 +91,19 @@ def context_bucket(panel: pd.DataFrame) -> pd.Series:
     return bucket
 
 
+def relative_bill_share_bucket(panel: pd.DataFrame) -> pd.Series:
+    """Return relative high/low/middle bill-share buckets."""
+
+    if "bill_share_bucket" in panel.columns:
+        return panel["bill_share_bucket"].fillna("missing").astype(str)
+    high = panel.get("high_bill_share_month", pd.Series(False, index=panel.index)).fillna(False).astype(bool)
+    low = panel.get("low_bill_share_month", pd.Series(False, index=panel.index)).fillna(False).astype(bool)
+    bucket = pd.Series("middle_bill_share", index=panel.index)
+    bucket.loc[high] = "high_bill_share"
+    bucket.loc[low] = "low_bill_share"
+    return bucket
+
+
 def sample_summary_table(panel: pd.DataFrame) -> pd.DataFrame:
     """Summarize target-group coverage and context-bucket support."""
 
@@ -121,6 +134,7 @@ def sample_summary_table(panel: pd.DataFrame) -> pd.DataFrame:
             continue
         work = sample.copy()
         work["treasury_context_bucket"] = context_bucket(work)
+        work["relative_bill_share_bucket"] = relative_bill_share_bucket(work)
         for group_name, gdf in [("all_target_groups", work), *list(work.groupby("bank_group"))]:
             row: dict[str, object] = {
                 "sample": sample_name,
@@ -134,6 +148,9 @@ def sample_summary_table(panel: pd.DataFrame) -> pd.DataFrame:
                 "mixed_or_unclassified_rows": int(
                     gdf["treasury_context_bucket"].eq("mixed_or_unclassified").sum()
                 ),
+                "high_bill_share_rows": int(gdf["relative_bill_share_bucket"].eq("high_bill_share").sum()),
+                "low_bill_share_rows": int(gdf["relative_bill_share_bucket"].eq("low_bill_share").sum()),
+                "middle_bill_share_rows": int(gdf["relative_bill_share_bucket"].eq("middle_bill_share").sum()),
                 "context_complete_share": float(
                     gdf.get("is_context_complete", pd.Series(False, index=gdf.index)).mean()
                 ),
@@ -170,6 +187,20 @@ def bank_group_response_table(panel: pd.DataFrame) -> pd.DataFrame:
     out = grouped[value_cols].mean()
     counts = grouped.size().rename(columns={"size": "n_rows"})
     return counts.merge(out, on=["bank_group", "treasury_context_bucket"], how="left")
+
+
+def relative_bill_share_response_table(panel: pd.DataFrame) -> pd.DataFrame:
+    """Compare average bank-group changes across relative high/low bill-share buckets."""
+
+    df = panel.copy()
+    df["relative_bill_share_bucket"] = relative_bill_share_bucket(df)
+    value_cols = [c for c in OUTCOME_CHANGE_COLUMNS if c in df.columns]
+    if not value_cols:
+        return pd.DataFrame(columns=["bank_group", "relative_bill_share_bucket", "n_rows"])
+    grouped = df.groupby(["bank_group", "relative_bill_share_bucket"], as_index=False)
+    out = grouped[value_cols].mean()
+    counts = grouped.size().rename(columns={"size": "n_rows"})
+    return counts.merge(out, on=["bank_group", "relative_bill_share_bucket"], how="left")
 
 
 def correlation_table(panel: pd.DataFrame, *, min_obs: int = 4) -> pd.DataFrame:
@@ -298,6 +329,11 @@ def run_first_pass_diagnostics(
         "bank_group_response_table": out_dir / "bank_group_response_table.csv",
         "common_target_response_table": out_dir / "common_target_response_table.csv",
         "tga_complete_response_table": out_dir / "tga_complete_response_table.csv",
+        "relative_bill_share_response_table": out_dir / "relative_bill_share_response_table.csv",
+        "common_target_relative_bill_share_response_table": out_dir
+        / "common_target_relative_bill_share_response_table.csv",
+        "tga_complete_relative_bill_share_response_table": out_dir
+        / "tga_complete_relative_bill_share_response_table.csv",
         "correlations": out_dir / "correlations.csv",
         "guarded_regressions": out_dir / "guarded_regressions.csv",
         "event_windows": out_dir / "event_windows.csv",
@@ -307,6 +343,15 @@ def run_first_pass_diagnostics(
     write_csv(bank_group_response_table(panel), outputs["bank_group_response_table"])
     write_csv(bank_group_response_table(target_common_panel(panel)), outputs["common_target_response_table"])
     write_csv(bank_group_response_table(tga_complete_target_panel(panel)), outputs["tga_complete_response_table"])
+    write_csv(relative_bill_share_response_table(panel), outputs["relative_bill_share_response_table"])
+    write_csv(
+        relative_bill_share_response_table(target_common_panel(panel)),
+        outputs["common_target_relative_bill_share_response_table"],
+    )
+    write_csv(
+        relative_bill_share_response_table(tga_complete_target_panel(panel)),
+        outputs["tga_complete_relative_bill_share_response_table"],
+    )
     write_csv(correlation_table(panel), outputs["correlations"])
     write_csv(guarded_regression_table(panel), outputs["guarded_regressions"])
     write_csv(event_window_table(panel, window=event_window), outputs["event_windows"])

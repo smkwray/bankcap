@@ -40,6 +40,8 @@ def build_analysis_panel(
         "high_rate_regime",
         "bill_heavy_month",
         "coupon_heavy_month",
+        "high_bill_share_month",
+        "low_bill_share_month",
         "slr_relief_window",
         "rate_duration_shock_window",
         "banking_stress_2023_window",
@@ -53,6 +55,10 @@ def build_analysis_panel(
         panel["is_context_complete"] = panel[existing].notna().all(axis=1)
     else:
         panel["is_context_complete"] = False
+
+    if "bill_share_bucket" not in panel.columns:
+        panel["bill_share_bucket"] = "missing"
+    panel["bill_share_bucket"] = panel["bill_share_bucket"].fillna("missing").astype(str)
 
     bool_cols = [c for c in panel.columns if c.endswith("_window") or c.endswith("_month")]
     bool_cols.append("high_rate_regime")

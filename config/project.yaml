@@ -39,6 +39,8 @@ schemas:
 thresholds:
   bill_heavy_min_bill_share: 0.60
   coupon_heavy_max_bill_share: 0.40
+  low_bill_share_quantile: 0.25
+  high_bill_share_quantile: 0.75
   high_rate_min_policy_rate_pct: 4.0
   large_tga_rebuild_min_change_usd_millions: 100000
 claim_boundary:

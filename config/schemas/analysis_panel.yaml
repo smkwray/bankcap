@@ -72,6 +72,15 @@ columns:
   - name: coupon_heavy_month
     dtype: bool
     required: true
+  - name: high_bill_share_month
+    dtype: bool
+    required: true
+  - name: low_bill_share_month
+    dtype: bool
+    required: true
+  - name: bill_share_bucket
+    dtype: string
+    required: true
   - name: slr_relief_window
     dtype: bool
     required: true

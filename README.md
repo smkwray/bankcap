@@ -139,6 +139,10 @@ The H.8 target-group workflow downloads Federal Reserve DDP packages into ignore
 normalizes complete monthly rows into ignored `data/imported/h8_fed/`, and then builds the derived
 panel.
 
+The diagnostics preserve fixed bill-heavy/coupon-heavy flags and add relative high-bill/low-bill
+bucket tables. The relative buckets are the safer first-pass comparison when fixed coupon-heavy
+months have little or no support.
+
 ## Required claim boundary
 
 - H.8 bank-group evidence is mechanism context, not bank-level identification.

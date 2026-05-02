@@ -56,6 +56,10 @@ bankcap build-h8-panel \
 The downloaded DDP packages and normalized local extract are ignored by git. The normalized H.8
 extract keeps only complete rows for required H.8 levels.
 
+The context builder preserves fixed bill-heavy/coupon-heavy flags and also writes relative
+high-bill/low-bill quantile buckets. Use the relative buckets when fixed coupon-heavy support is too
+thin for a stable comparison.
+
 ## Build Treasury context
 
 ```bash

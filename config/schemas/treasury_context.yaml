@@ -50,6 +50,18 @@ columns:
   - name: coupon_heavy_month
     dtype: bool
     required: true
+  - name: high_bill_share_month
+    dtype: bool
+    required: true
+    description: "Relative high-bill bucket based on the configured bill-share quantile."
+  - name: low_bill_share_month
+    dtype: bool
+    required: true
+    description: "Relative low-bill bucket based on the configured bill-share quantile."
+  - name: bill_share_bucket
+    dtype: string
+    required: true
+    allowed_values: [high_bill_share, middle_bill_share, low_bill_share, missing]
   - name: slr_relief_window
     dtype: bool
     required: true
