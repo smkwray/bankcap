@@ -1,0 +1,50 @@
+calendar_windows:
+  slr_relief_window:
+    label: "Temporary 2020 SLR relief window"
+    start: "2020-04-01"
+    end: "2021-03-31"
+    notes: "Used only as descriptive policy-window context in the H.8 screen."
+  rate_duration_shock_window:
+    label: "2022-23 high-rate and duration shock window"
+    start: "2022-03-01"
+    end: "2023-12-31"
+    notes: "First-pass calendar proxy for the post-liftoff duration/rate shock environment."
+  banking_stress_2023_window:
+    label: "2023 banking stress window"
+    start: "2023-03-01"
+    end: "2023-05-31"
+    notes: "Descriptive stress-window flag; not a bank-level failure-exposure design."
+  tga_rebuild_2023_window:
+    label: "Large 2023 TGA rebuild window"
+    start: "2023-06-01"
+    end: "2023-09-30"
+    target_column: large_tga_rebuild_window
+    notes: "Calendar backstop; data-driven TGA-change flags may add additional periods."
+  qt_2017_2019_window:
+    label: "QT window, first tightening cycle"
+    start: "2017-10-01"
+    end: "2019-07-31"
+    target_column: qt_regime_window
+  qt_2022_forward_window:
+    label: "QT window, post-2022 tightening cycle"
+    start: "2022-06-01"
+    end: "2100-12-31"
+    target_column: qt_regime_window
+  qe_2020_2022_window:
+    label: "QE / balance-sheet expansion window"
+    start: "2020-03-01"
+    end: "2022-03-31"
+    target_column: qe_regime_window
+  high_rate_2022_forward_window:
+    label: "High-rate calendar window"
+    start: "2022-06-01"
+    end: "2100-12-31"
+    target_column: high_rate_regime
+
+event_window_defaults:
+  window_periods_each_side: 3
+  event_flags:
+    - slr_relief_window
+    - rate_duration_shock_window
+    - banking_stress_2023_window
+    - large_tga_rebuild_window

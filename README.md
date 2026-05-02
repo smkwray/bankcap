@@ -1,49 +1,147 @@
 # bankcap
 
-`bankcap` is the Project 5 workspace for the TDC thesis extension:
-bank balance-sheet capacity, Treasury absorption, SLR/duration constraints, and
-bank-group mechanism evidence.
+`bankcap` is the Project 5 workspace for the TDC thesis extension: **Bank-Level
+Maturity Capacity, SLR, and Duration Constraints**. The first implementation is a
+low-cost **Federal Reserve H.8 bank-group mechanism screen**, not a Call Report or
+FR Y-9C bank-level project.
 
-The first build should stay narrow. Start with Federal Reserve H.8 bank groups
-before moving to Call Reports or FR Y-9C.
+Core question:
 
-## Research Question
+> Which banks can absorb Treasury debt, and do their deposits, loans, funding,
+> and liquidity buffers respond differently when Treasury financing is bill-heavy,
+> coupon-heavy, or concentrated in TGA rebuild/QT/high-rate episodes?
 
-Which banks can absorb Treasury debt, and do their deposits, loans, funding, and
-liquidity buffers respond differently when Treasury financing is bill-heavy,
-coupon-heavy, or concentrated in TGA rebuild/QT episodes?
+## What this seed includes
 
-## First Milestone
+```text
+bankcap/
+├── README.md
+├── CODEX_NEXT_STEPS.md
+├── pyproject.toml
+├── config/
+│   ├── project.yaml
+│   ├── episodes.yaml
+│   ├── source_contracts/
+│   │   ├── buycurve.yaml
+│   │   ├── tdcladder.yaml
+│   │   ├── liqsub.yaml
+│   │   ├── tdcest.yaml
+│   │   └── tdcpass.yaml
+│   └── schemas/
+│       ├── h8_bank_group_outcomes.yaml
+│       ├── treasury_context.yaml
+│       └── analysis_panel.yaml
+├── src/bankcap/
+│   ├── cli.py
+│   ├── config.py
+│   ├── contracts.py
+│   ├── h8.py
+│   ├── treasury_context.py
+│   ├── panel.py
+│   ├── diagnostics.py
+│   ├── reporting.py
+│   ├── schemas.py
+│   └── episodes.py
+├── tests/
+│   ├── fixtures/                 # small synthetic CSVs only
+│   └── test_*.py
+├── docs/
+│   ├── research_design.md
+│   ├── data_reuse.md
+│   ├── claim_boundaries.md
+│   ├── h8_vs_bank_level_identification.md
+│   ├── call_report_y9c_gate.md
+│   ├── cli_reference.md
+│   ├── schema_reference.md
+│   ├── implementation_plan.md
+└── do/                            # local-only planning, ignored by git
+    └── IMPLEMENTATION_TRANCHES.md
+```
 
-Build an H.8 bank-group screen:
+The repository intentionally excludes raw data and generated bulk outputs. Local imports from sibling
+projects are copied into ignored paths under `data/imported/`; derived panels and reports are written
+under ignored `data/derived/` and `output/`.
 
-- large domestically chartered banks;
-- small domestically chartered banks;
-- foreign-related institutions;
-- outcomes: securities, deposits, loans, cash assets, and ratios to deposits or
-  assets;
-- treatments/context: bill share, WAM, gross issuance, liquidity-weighted
-  Treasury supply, TGA changes, high-rate/QT regimes, and large rebuild
-  episodes.
+## Install and test
 
-The first deliverable is a go/no-go report on whether heavier Call Report or
-FR Y-9C data engineering is worth doing.
+```bash
+python -m venv ~/venvs/bankcap
+source ~/venvs/bankcap/bin/activate
+python -m pip install -e '.[dev]'
+python -B -m pytest -q
+bankcap validate-config
+```
 
-## Reuse First
+## First-pass workflow
 
-Do not duplicate upstream work at the start.
+Set sibling roots in your shell or pass `--source-root` per command:
 
-- Use `buycurve` for issuance composition, bill share, auction maturity panels,
-  and H.8 context.
-- Use `tdcladder` for WAM, bill share, liquidity-weighted Treasury supply, and
-  episode-design surfaces.
-- Use `liqsub` for H.8/H.4.1/OFR plumbing panels and evidence-gate context.
-- Use `tdcest`/`tdcpass` only for TDC anchors and pass-through comparison if the
-  bank-group screen needs them.
+```bash
+export BUYCURVE_ROOT=../buycurve
+export TDCLADDER_ROOT=../tdcladder
+export LIQSUB_ROOT=../liqsub
+```
 
-## Claim Boundary
+Validate and import the required sibling outputs:
 
-H.8 bank-group evidence is mechanism context, not bank-level identification.
-Bank-level claims require Call Report or FR Y-9C identifier, merger, MDRM-code,
-pre-trend, and fixed-effect discipline. Public aggregates may mix Treasury and
-agency securities; label the measure honestly.
+```bash
+bankcap validate-sibling-sources --sibling buycurve --source-root "$BUYCURVE_ROOT" --required-only
+bankcap validate-sibling-sources --sibling tdcladder --source-root "$TDCLADDER_ROOT" --required-only
+bankcap validate-sibling-sources --sibling liqsub --source-root "$LIQSUB_ROOT" --required-only
+
+bankcap copy-sibling-outputs --sibling buycurve --source-root "$BUYCURVE_ROOT" --required-only --manifest data/imported/buycurve_manifest.csv
+bankcap copy-sibling-outputs --sibling tdcladder --source-root "$TDCLADDER_ROOT" --required-only --manifest data/imported/tdcladder_manifest.csv
+bankcap copy-sibling-outputs --sibling liqsub --source-root "$LIQSUB_ROOT" --required-only --manifest data/imported/liqsub_manifest.csv
+```
+
+Build the seed panels:
+
+```bash
+bankcap build-h8-panel \
+  --input data/imported/liqsub/weekly_liquidity_substitution_panel.csv \
+  --output data/derived/h8_bank_group_panel.csv \
+  --frequency monthly
+
+bankcap build-treasury-context \
+  --buycurve data/imported/buycurve/monthly_issuance_maturity_panel.csv \
+  --tdcladder data/imported/tdcladder/monthly_ladder_panel.csv \
+  --liqsub data/imported/liqsub/monthly_liquidity_substitution_panel.csv \
+  --output data/derived/treasury_context_panel.csv
+
+bankcap build-analysis-panel \
+  --h8 data/derived/h8_bank_group_panel.csv \
+  --context data/derived/treasury_context_panel.csv \
+  --output data/derived/bankcap_analysis_panel.csv
+
+bankcap run-diagnostics \
+  --panel data/derived/bankcap_analysis_panel.csv \
+  --output-dir output/diagnostics
+
+bankcap write-go-no-go-report \
+  --panel data/derived/bankcap_analysis_panel.csv \
+  --diagnostics-dir output/diagnostics \
+  --output output/reports/h8_go_no_go_report.md
+```
+
+The H.8 builder currently expects a long-form bank-group input with date, group, securities, deposits,
+loans, and cash assets. The next implementation tranche should map actual imported H.8/liqsub column
+names into that canonical shape if the sibling panel uses a wider format.
+
+## Required claim boundary
+
+- H.8 bank-group evidence is mechanism context, not bank-level identification.
+- H.8 securities may combine Treasury and agency securities; labels must say so.
+- Do not claim bank-level heterogeneity without bank-level data.
+- Do not infer causal absorption from descriptive H.8 co-movement.
+- Call Reports or FR Y-9C should be a second phase only if the H.8 screen is promising.
+- Reuse `buycurve`, `tdcladder`, and `liqsub` outputs before downloading new data or duplicating
+  transformations.
+
+## Sibling reuse
+
+- `buycurve`: issuance composition, bill share, maturity buckets, buyer shares, and H.8 context.
+- `tdcladder`: WAM, bill share, liquidity-weighted Treasury supply, TDC comparison, and episode surfaces.
+- `liqsub`: H.8/H.4.1/OFR plumbing panels, TGA/reserves/ON RRP/MMF context, and evidence gates.
+- `tdcest` and `tdcpass`: optional quarterly comparison anchors only after the H.8 screen needs them.
+
+See `docs/data_reuse.md` and `config/source_contracts/*.yaml` for source contracts and guardrails.

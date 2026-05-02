@@ -1,0 +1,76 @@
+name: h8_bank_group_outcomes
+version: 1
+frequency: weekly_or_monthly
+primary_key:
+  - period
+  - bank_group
+claim_boundary: >-
+  H.8 bank-group outcomes are aggregate mechanism-context measures. Securities should be labeled
+  as H.8 securities / Treasury-plus-agency or equivalent, not Treasury-only unless the source mapping
+  proves that distinction.
+columns:
+  - name: period
+    dtype: string
+    required: true
+    description: "Analysis period: YYYY-MM for monthly or YYYY-MM-DD for weekly."
+  - name: date
+    dtype: datetime
+    required: true
+    description: "Underlying H.8 observation date or month-end date."
+  - name: frequency
+    dtype: string
+    required: true
+    allowed_values: [weekly, monthly]
+  - name: bank_group
+    dtype: string
+    required: true
+    allowed_values:
+      - large_domestic_banks
+      - small_domestic_banks
+      - foreign_related_institutions
+  - name: securities_usd_millions
+    dtype: numeric
+    required: true
+    description: "H.8 securities aggregate, often Treasury plus agency securities."
+  - name: deposits_usd_millions
+    dtype: numeric
+    required: true
+  - name: loans_usd_millions
+    dtype: numeric
+    required: true
+  - name: cash_assets_usd_millions
+    dtype: numeric
+    required: true
+  - name: securities_deposits_ratio
+    dtype: numeric
+    required: true
+  - name: cash_deposits_ratio
+    dtype: numeric
+    required: true
+  - name: loans_deposits_ratio
+    dtype: numeric
+    required: true
+  - name: d_securities_usd_millions
+    dtype: numeric
+    required: false
+  - name: d_deposits_usd_millions
+    dtype: numeric
+    required: false
+  - name: d_loans_usd_millions
+    dtype: numeric
+    required: false
+  - name: d_cash_assets_usd_millions
+    dtype: numeric
+    required: false
+  - name: d_securities_deposits_ratio
+    dtype: numeric
+    required: false
+  - name: d_cash_deposits_ratio
+    dtype: numeric
+    required: false
+  - name: d_loans_deposits_ratio
+    dtype: numeric
+    required: false
+  - name: h8_security_label
+    dtype: string
+    required: false

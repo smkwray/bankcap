@@ -1,0 +1,58 @@
+project: buycurve
+kind: sibling_source_contract
+required_for_first_pass: true
+default_source_root_env: BUYCURVE_ROOT
+local_import_root: data/imported/buycurve
+role: >-
+  Auction-allotment and issuance-composition backend. Use for monthly gross issuance, bill share,
+  maturity buckets, buyer shares, and H.8 auction-to-holder context.
+guardrails:
+  - Auction allotments identify initial absorption, not final holders.
+  - Dealer share is an intermediation bridge.
+  - H.8 context is holder-stock context, not direct auction validation.
+artifacts:
+  - id: monthly_issuance_maturity_panel
+    path: data/clean/monthly_issuance_maturity_panel.csv
+    local_path: data/imported/buycurve/monthly_issuance_maturity_panel.csv
+    required: true
+    frequency: monthly
+    key_columns: [month]
+    required_columns: [month]
+    useful_columns:
+      - bill_share
+      - gross_issuance_usd
+      - bill_issuance_usd
+      - coupon_issuance_usd
+      - wam_months
+    accepted_column_aliases:
+      period: [month, date, period]
+      bill_share: [bill_share, bill_issuance_share, share_bills, bills_share]
+      gross_issuance_usd: [gross_issuance_usd, total_issuance_usd, issuance_usd, gross_issuance]
+  - id: monthly_issuance_maturity_panel_base
+    path: data/clean/monthly_issuance_maturity_panel_base.csv
+    local_path: data/imported/buycurve/monthly_issuance_maturity_panel_base.csv
+    required: false
+    frequency: monthly
+    key_columns: [month]
+    required_columns: [month]
+  - id: monthly_buyer_shares
+    path: data/clean/monthly_buyer_shares.csv
+    local_path: data/imported/buycurve/monthly_buyer_shares.csv
+    required: false
+    frequency: monthly
+    key_columns: [month]
+    required_columns: [month]
+  - id: monthly_bank_allotment_h8_context
+    path: output/qa/monthly_bank_allotment_h8_context.csv
+    local_path: data/imported/buycurve/monthly_bank_allotment_h8_context.csv
+    required: false
+    frequency: monthly
+    key_columns: [month]
+    required_columns: [month]
+  - id: monthly_regression_panel
+    path: output/analysis/regression/monthly_regression_panel.csv
+    local_path: data/imported/buycurve/monthly_regression_panel.csv
+    required: false
+    frequency: monthly
+    key_columns: [month]
+    required_columns: [month]

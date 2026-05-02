@@ -1,0 +1,19 @@
+date,bank_group,securities_usd_millions,deposits_usd_millions,loans_usd_millions,cash_assets_usd_millions
+2023-01-06,large domestically chartered banks,1000,5000,3200,700
+2023-01-27,large domestically chartered banks,1020,5020,3210,690
+2023-02-03,large domestically chartered banks,1030,5030,3220,680
+2023-02-24,large domestically chartered banks,1040,5040,3230,670
+2023-03-03,large domestically chartered banks,1050,5050,3240,660
+2023-03-31,large domestically chartered banks,1080,5000,3230,720
+2023-01-06,small domestically chartered banks,500,2500,1800,300
+2023-01-27,small domestically chartered banks,510,2510,1810,295
+2023-02-03,small domestically chartered banks,515,2520,1820,292
+2023-02-24,small domestically chartered banks,520,2530,1830,290
+2023-03-03,small domestically chartered banks,525,2540,1840,288
+2023-03-31,small domestically chartered banks,540,2520,1835,310
+2023-01-06,foreign-related institutions,300,1200,600,450
+2023-01-27,foreign-related institutions,305,1210,605,440
+2023-02-03,foreign-related institutions,310,1215,610,435
+2023-02-24,foreign-related institutions,315,1220,615,430
+2023-03-03,foreign-related institutions,320,1218,618,425
+2023-03-31,foreign-related institutions,330,1190,610,470

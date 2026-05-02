@@ -1,5 +1,5 @@
-"""Bank balance-sheet capacity and Treasury absorption diagnostics."""
+"""Bank-group balance-sheet capacity diagnostics for the TDC thesis extension."""
 
-__all__ = ["__version__"]
+from __future__ import annotations
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

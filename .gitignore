@@ -1,28 +1,43 @@
-# Agent orchestration and private planning
-do/
-
-# Local environment
-.env
-
-# Data and generated outputs
-data/raw/
-data/interim/
-data/clean/
-data/cache/
-output/
-
-# Python artifacts
+# Python
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
+*.egg-info/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
-*.egg-info/
-dist/
-build/
+.coverage
+htmlcov/
 
-# Editor / OS
+# Local environments and secrets
+.env
+.venv/
+venv/
+.envrc
+
+# Local orchestration and private context
+do/
+docs/source_context/
+
+# OS/editor
 .DS_Store
-.vscode/
 .idea/
+.vscode/
+
+# Local data and generated outputs: intentionally not shipped
+/data/raw/
+/data/cache/
+/data/interim/
+/data/imported/**
+/data/derived/**
+/output/**
+
+# Keep placeholder directories
+!/data/.gitkeep
+!/data/imported/.gitkeep
+!/data/derived/.gitkeep
+!/output/.gitkeep
+
+# Bundles
+*.zip
+*.tar
+*.tar.gz

@@ -1,0 +1,19 @@
+project: tdcpass
+kind: sibling_source_contract
+required_for_first_pass: false
+default_source_root_env: TDCPASS_ROOT
+local_import_root: data/imported/tdcpass
+role: >-
+  Optional pass-through and matched-deposit comparison anchor. Use only after the H.8 bank-group
+  screen identifies a reason to compare against quarterly TDC/pass-through diagnostics.
+guardrails:
+  - The broad TDC estimate and independently confirmed non-TDC evidence are not the same object.
+  - Residual accounting is diagnostic, not independent channel evidence.
+artifacts:
+  - id: quarterly_panel
+    path: data/derived/quarterly_panel.csv
+    local_path: data/imported/tdcpass/quarterly_panel.csv
+    required: false
+    frequency: quarterly
+    key_columns: [quarter]
+    required_columns: [quarter]

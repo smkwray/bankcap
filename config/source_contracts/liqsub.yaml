@@ -1,0 +1,55 @@
+project: liqsub
+kind: sibling_source_contract
+required_for_first_pass: true
+default_source_root_env: LIQSUB_ROOT
+local_import_root: data/imported/liqsub
+role: >-
+  Liquidity-plumbing diagnostics backend. Use for H.8/H.4.1/OFR plumbing panels, TGA/reserves/ON RRP/MMF
+  context, readiness gates, and large TGA rebuild diagnostics.
+guardrails:
+  - Current broad substitution claims are blocked.
+  - Use liqsub as plumbing context and diagnostic evidence, not headline causal evidence.
+artifacts:
+  - id: monthly_liquidity_substitution_panel
+    path: data/clean/monthly_liquidity_substitution_panel.csv
+    local_path: data/imported/liqsub/monthly_liquidity_substitution_panel.csv
+    required: true
+    frequency: monthly
+    key_columns: [month]
+    required_columns: [month]
+    useful_columns:
+      - tga_change_usd_millions
+      - reserves_change_usd_millions
+      - onrrp_change_usd_millions
+      - deposits_usd_millions
+    accepted_column_aliases:
+      period: [month, date, period]
+      tga_change_usd_millions: [tga_change_usd_millions, d_tga_usd_millions, tga_change]
+  - id: monthly_liquidity_substitution_panel_analysis
+    path: data/clean/monthly_liquidity_substitution_panel_analysis.csv
+    local_path: data/imported/liqsub/monthly_liquidity_substitution_panel_analysis.csv
+    required: false
+    frequency: monthly
+    key_columns: [month]
+    required_columns: [month]
+  - id: weekly_liquidity_substitution_panel
+    path: data/clean/weekly_liquidity_substitution_panel.csv
+    local_path: data/imported/liqsub/weekly_liquidity_substitution_panel.csv
+    required: false
+    frequency: weekly
+    key_columns: [date]
+    required_columns: [date]
+  - id: evidence_gate_summary
+    path: output/tables/evidence_gate_summary.csv
+    local_path: data/imported/liqsub/evidence_gate_summary.csv
+    required: false
+    frequency: summary
+    key_columns: []
+    required_columns: []
+  - id: weekly_large_rebuild_final_review
+    path: output/tables/weekly_large_rebuild_final_review.csv
+    local_path: data/imported/liqsub/weekly_large_rebuild_final_review.csv
+    required: false
+    frequency: weekly
+    key_columns: []
+    required_columns: []

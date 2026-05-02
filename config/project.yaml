@@ -1,14 +1,48 @@
 project: bankcap
-status: scaffold
-primary_question: "Which banks can absorb Treasury debt, and do their deposits, loans, funding, and liquidity buffers respond differently?"
-first_milestone: h8_bank_group_screen
-reuse_first:
-  - buycurve
-  - tdcladder
-  - liqsub
-  - tdcest
-  - tdcpass
+version: 0.2.0
+status: seeded_codex_ready
+primary_question: >-
+  Which banks can absorb Treasury debt, and do their deposits, loans, funding,
+  and liquidity buffers respond differently when Treasury financing is bill-heavy,
+  coupon-heavy, or concentrated in TGA rebuild/QT/high-rate episodes?
+first_milestone: h8_bank_group_mechanism_screen
+analysis_unit:
+  primary: bank_group_period
+  first_pass_frequencies:
+    - weekly
+    - monthly
+  preferred_first_pass_frequency: monthly
+h8_groups:
+  - large_domestic_banks
+  - small_domestic_banks
+  - foreign_related_institutions
+paths:
+  source_contracts: config/source_contracts
+  schemas: config/schemas
+  episodes: config/episodes.yaml
+  imported_data: data/imported
+  derived_data: data/derived
+  diagnostics_output: output/diagnostics
+  reports_output: output/reports
+source_contracts:
+  - config/source_contracts/buycurve.yaml
+  - config/source_contracts/tdcladder.yaml
+  - config/source_contracts/liqsub.yaml
+  - config/source_contracts/tdcest.yaml
+  - config/source_contracts/tdcpass.yaml
+schemas:
+  h8_bank_group_outcomes: config/schemas/h8_bank_group_outcomes.yaml
+  treasury_context: config/schemas/treasury_context.yaml
+  analysis_panel: config/schemas/analysis_panel.yaml
+thresholds:
+  bill_heavy_min_bill_share: 0.60
+  coupon_heavy_max_bill_share: 0.40
+  high_rate_min_policy_rate_pct: 4.0
+  large_tga_rebuild_min_change_usd_millions: 100000
 claim_boundary:
   - H.8 bank-group evidence is mechanism context, not bank-level identification.
-  - Bank-level claims require Call Report or FR Y-9C data discipline.
-  - Public aggregates may mix Treasury and agency securities.
+  - H.8 securities may combine Treasury and agency securities; labels must say so.
+  - Do not claim bank-level heterogeneity without Call Report, FR Y-9C, or equivalent bank-level data.
+  - Do not infer causal absorption from descriptive H.8 co-movement.
+  - Reuse sibling outputs before downloading or transforming new data.
+  - Call Reports or FR Y-9C are second-phase only after the H.8 go/no-go report.

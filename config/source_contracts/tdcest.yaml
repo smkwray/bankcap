@@ -1,0 +1,33 @@
+project: tdcest
+kind: sibling_source_contract
+required_for_first_pass: false
+default_source_root_env: TDCEST_ROOT
+local_import_root: data/imported/tdcest
+role: >-
+  Optional quarterly TDC anchor. Use only if the H.8 screen needs a TDC comparison; do not make the
+  first bank-group screen depend on new TDC estimation.
+guardrails:
+  - The main estimator is marketable-Treasury focused.
+  - Historical overlays and broad-depository alternatives are comparison surfaces, not the first-pass treatment.
+artifacts:
+  - id: tdc_estimates
+    path: data/processed/tdc_estimates.csv
+    local_path: data/imported/tdcest/tdc_estimates.csv
+    required: false
+    frequency: quarterly
+    key_columns: [quarter]
+    required_columns: [quarter]
+  - id: tdc_components
+    path: data/processed/tdc_components.csv
+    local_path: data/imported/tdcest/tdc_components.csv
+    required: false
+    frequency: quarterly
+    key_columns: [quarter]
+    required_columns: [quarter]
+  - id: tdc_downstream_handoff_bundle
+    path: data/processed/tdc_downstream_handoff_bundle.json
+    local_path: data/imported/tdcest/tdc_downstream_handoff_bundle.json
+    required: false
+    frequency: handoff
+    key_columns: []
+    required_columns: []

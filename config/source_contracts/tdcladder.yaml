@@ -1,0 +1,60 @@
+project: tdcladder
+kind: sibling_source_contract
+required_for_first_pass: true
+default_source_root_env: TDCLADDER_ROOT
+local_import_root: data/imported/tdcladder
+role: >-
+  Liquidity-weighted Treasury supply backend. Use for WAM, bill share, liquidity-weighted supply,
+  TDC comparison surfaces, and episode-design tables.
+guardrails:
+  - Liquidity weights are measurement assumptions, not structural facts.
+  - Episode-design outputs are descriptive triage surfaces, not causal local projections.
+artifacts:
+  - id: monthly_ladder_panel
+    path: data/clean/monthly_ladder_panel.csv
+    local_path: data/imported/tdcladder/monthly_ladder_panel.csv
+    required: true
+    frequency: monthly
+    key_columns: [month]
+    required_columns: [month]
+    useful_columns:
+      - bill_share
+      - wam_months
+      - liquidity_weighted_treasury_supply_usd
+    accepted_column_aliases:
+      period: [month, date, period]
+      bill_share: [bill_share, basis_bill_share, fixed_baseline_bill_share]
+      wam_months: [wam_months, basis_wam_months, fixed_baseline_wam_months]
+      liquidity_weighted_treasury_supply_usd:
+        - liquidity_weighted_treasury_supply_usd
+        - liquid_treasury_supply_usd
+        - fixed_baseline_liquid_supply_usd
+        - liquidity_weighted_supply_usd
+  - id: monthly_episode_design
+    path: output/tables/monthly_episode_design.csv
+    local_path: data/imported/tdcladder/monthly_episode_design.csv
+    required: false
+    frequency: monthly
+    key_columns: [month]
+    required_columns: [month]
+  - id: quarterly_tdc_comparison_panel
+    path: data/clean/quarterly_tdc_comparison_panel.csv
+    local_path: data/imported/tdcladder/quarterly_tdc_comparison_panel.csv
+    required: false
+    frequency: quarterly
+    key_columns: [quarter]
+    required_columns: [quarter]
+  - id: core_measurement_summary
+    path: output/tables/core_measurement_summary.csv
+    local_path: data/imported/tdcladder/core_measurement_summary.csv
+    required: false
+    frequency: summary
+    key_columns: []
+    required_columns: []
+  - id: analysis_unit_assumptions
+    path: output/qa/analysis_unit_assumptions.csv
+    local_path: data/imported/tdcladder/analysis_unit_assumptions.csv
+    required: false
+    frequency: qa
+    key_columns: []
+    required_columns: []
