@@ -26,8 +26,14 @@ artifacts:
       - wam_months
     accepted_column_aliases:
       period: [month, date, period]
-      bill_share: [bill_share, bill_issuance_share, share_bills, bills_share]
-      gross_issuance_usd: [gross_issuance_usd, total_issuance_usd, issuance_usd, gross_issuance]
+      bill_share: [bill_share, bill_issuance_share, share_bills, bills_share, bill_share_by_accepted_amount]
+      gross_issuance_usd:
+        - gross_issuance_usd
+        - total_issuance_usd
+        - issuance_usd
+        - gross_issuance
+        - accepted_amount_sum
+        - offering_amount_sum
   - id: monthly_issuance_maturity_panel_base
     path: data/clean/monthly_issuance_maturity_panel_base.csv
     local_path: data/imported/buycurve/monthly_issuance_maturity_panel_base.csv

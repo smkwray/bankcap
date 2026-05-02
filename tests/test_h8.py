@@ -31,3 +31,30 @@ def test_build_h8_weekly_panel():
     assert len(panel) == 18
     assert panel["period"].str.len().eq(10).all()
     assert pd.to_numeric(panel["cash_deposits_ratio"]).notna().all()
+
+
+def test_build_h8_from_liqsub_aggregate_shape(tmp_path):
+    source = tmp_path / "liqsub_h8.csv"
+    source.write_text(
+        "month,deposits,cash_assets,bank_treasury_agency_securities,total_bank_credit\n"
+        "2023-01-01,1000,100,250,700\n"
+        "2023-02-01,1100,90,260,720\n"
+    )
+    panel = build_h8_bank_group_panel(source, frequency="monthly")
+    assert set(panel["bank_group"]) == {"all_commercial_banks"}
+    assert panel.loc[panel["period"] == "2023-01", "loans_usd_millions"].iloc[0] == 450
+    assert panel.loc[panel["period"] == "2023-02", "d_cash_assets_usd_millions"].iloc[0] == -10
+
+
+def test_build_h8_from_buycurve_h8_context_shape(tmp_path):
+    source = tmp_path / "buycurve_h8_context.csv"
+    source.write_text(
+        "month,bank_group,bank_credit_month_latest,securities_in_bank_credit_month_latest,"
+        "treasury_agency_securities_month_latest,cash_assets_month_latest,deposits_month_latest\n"
+        "2023-01-01,domestically_chartered_banks,900,300,225,120,1000\n"
+    )
+    panel = build_h8_bank_group_panel(source, frequency="monthly")
+    row = panel.iloc[0]
+    assert row["bank_group"] == "domestically_chartered_banks"
+    assert row["loans_usd_millions"] == 600
+    assert row["securities_usd_millions"] == 225

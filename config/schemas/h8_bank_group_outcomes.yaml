@@ -25,6 +25,8 @@ columns:
     dtype: string
     required: true
     allowed_values:
+      - all_commercial_banks
+      - domestically_chartered_banks
       - large_domestic_banks
       - small_domestic_banks
       - foreign_related_institutions

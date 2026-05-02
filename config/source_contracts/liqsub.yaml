@@ -22,9 +22,19 @@ artifacts:
       - reserves_change_usd_millions
       - onrrp_change_usd_millions
       - deposits_usd_millions
+      - bank_treasury_agency_securities
+      - total_bank_credit
+      - cash_assets
     accepted_column_aliases:
       period: [month, date, period]
-      tga_change_usd_millions: [tga_change_usd_millions, d_tga_usd_millions, tga_change]
+      tga_change_usd_millions: [tga_change_usd_millions, d_tga_usd_millions, tga_change, d_tga, tga]
+      deposits_usd_millions: [deposits_usd_millions, deposits]
+      cash_assets_usd_millions: [cash_assets_usd_millions, cash_assets]
+      securities_usd_millions:
+        - securities_usd_millions
+        - bank_treasury_agency_securities
+        - treasury_agency_securities
+      loans_usd_millions: [loans_usd_millions, loans, total_bank_credit]
   - id: monthly_liquidity_substitution_panel_analysis
     path: data/clean/monthly_liquidity_substitution_panel_analysis.csv
     local_path: data/imported/liqsub/monthly_liquidity_substitution_panel_analysis.csv

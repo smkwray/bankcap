@@ -16,7 +16,6 @@ Core question:
 ```text
 bankcap/
 ├── README.md
-├── CODEX_NEXT_STEPS.md
 ├── pyproject.toml
 ├── config/
 │   ├── project.yaml

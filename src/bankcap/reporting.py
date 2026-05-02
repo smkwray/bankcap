@@ -17,10 +17,18 @@ exposure, or causal absorption. H.8 securities should be labeled as an aggregate
 Treasury and agency securities unless a source-specific mapping proves otherwise.
 """
 
+TARGET_H8_GROUPS = {
+    "large_domestic_banks",
+    "small_domestic_banks",
+    "foreign_related_institutions",
+}
+
 
 def _diagnostic_signal(panel: pd.DataFrame) -> tuple[str, list[str]]:
     periods = panel["period"].nunique() if "period" in panel.columns else 0
     groups = panel["bank_group"].nunique() if "bank_group" in panel.columns else 0
+    observed_groups = set(panel["bank_group"].dropna().astype(str)) if "bank_group" in panel.columns else set()
+    target_groups = len(observed_groups.intersection(TARGET_H8_GROUPS))
     context_complete = (
         float(panel.get("is_context_complete", pd.Series(False, index=panel.index)).mean())
         if len(panel)
@@ -34,12 +42,16 @@ def _diagnostic_signal(panel: pd.DataFrame) -> tuple[str, list[str]]:
     reasons = [
         f"sample periods: {periods}",
         f"bank groups observed: {groups}",
+        f"target H.8 groups observed: {target_groups} of {len(TARGET_H8_GROUPS)}",
         f"context-complete row share: {context_complete:.2f}",
         f"bill/coupon context variation present: {bill_variation}",
     ]
-    if periods >= 24 and groups >= 3 and context_complete >= 0.75 and bill_variation:
+    if target_groups == 0:
+        reasons.append("current H.8 reuse is aggregate-only; large/small/foreign split is still missing")
+        return "NO-GO for heavy bank-level ingestion until target H.8 group coverage is available", reasons
+    if periods >= 24 and target_groups >= 3 and context_complete >= 0.75 and bill_variation:
         return "PROVISIONAL GO for a scoped bank-level design memo", reasons
-    if periods >= 12 and groups >= 2 and bill_variation:
+    if periods >= 12 and target_groups >= 2 and bill_variation:
         return "PARTIAL GO: improve coverage before Call Report or FR Y-9C ingestion", reasons
     return "NO-GO for heavy bank-level ingestion until H.8 coverage/context improves", reasons
 

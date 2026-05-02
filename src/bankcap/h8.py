@@ -17,6 +17,8 @@ BANK_GROUPS = {
     "large_domestic_banks",
     "small_domestic_banks",
     "foreign_related_institutions",
+    "all_commercial_banks",
+    "domestically_chartered_banks",
 }
 
 GROUP_ALIASES = {
@@ -32,6 +34,11 @@ GROUP_ALIASES = {
     "foreign related institutions": "foreign_related_institutions",
     "foreign_related": "foreign_related_institutions",
     "foreign": "foreign_related_institutions",
+    "all commercial banks": "all_commercial_banks",
+    "all_commercial": "all_commercial_banks",
+    "domestically chartered banks": "domestically_chartered_banks",
+    "domestically_chartered": "domestically_chartered_banks",
+    "domestic banks": "domestically_chartered_banks",
 }
 
 H8_ALIASES = {
@@ -44,18 +51,27 @@ H8_ALIASES = {
         "h8_securities_usd_millions",
         "treasury_agency_securities_usd_millions",
         "securities_treasury_agency_usd_millions",
+        "bank_treasury_agency_securities",
+        "treasury_agency_securities_month_latest",
+        "treasury_agency_securities_monthly_avg",
+        "treasury_agency_non_mbs_month_latest",
+        "treasury_agency_non_mbs_monthly_avg",
     ],
     "deposits_usd_millions": [
         "deposits_usd_millions",
         "deposits",
         "bank_deposits_usd_millions",
         "h8_deposits_usd_millions",
+        "deposits_month_latest",
+        "deposits_monthly_avg",
     ],
     "loans_usd_millions": [
         "loans_usd_millions",
         "loans",
         "bank_loans_usd_millions",
         "h8_loans_usd_millions",
+        "loans_month_latest",
+        "loans_monthly_avg",
     ],
     "cash_assets_usd_millions": [
         "cash_assets_usd_millions",
@@ -63,6 +79,8 @@ H8_ALIASES = {
         "cash_usd_millions",
         "bank_cash_assets_usd_millions",
         "reserves_cash_assets_usd_millions",
+        "cash_assets_month_latest",
+        "cash_assets_monthly_avg",
     ],
 }
 
@@ -91,6 +109,13 @@ def _coalesce_column(df: pd.DataFrame, aliases: list[str], target: str) -> pd.Se
     raise ValueError(f"Could not find column for {target}; accepted aliases: {aliases}")
 
 
+def _coalesce_optional_column(df: pd.DataFrame, aliases: list[str]) -> pd.Series | None:
+    for alias in aliases:
+        if alias in df.columns:
+            return df[alias]
+    return None
+
+
 def _normalize_group(value: object) -> str:
     text = str(value).strip()
     normalized = text.lower().replace("/", " ").replace("_", " ").replace("-", " ")
@@ -105,12 +130,77 @@ def _normalize_group(value: object) -> str:
     raise ValueError(f"Unknown H.8 bank group: {value!r}")
 
 
+def _default_bank_group(df: pd.DataFrame) -> str | None:
+    columns = set(df.columns)
+    if {
+        "bank_treasury_agency_securities",
+        "total_bank_credit",
+        "cash_assets",
+        "deposits",
+    }.issubset(columns):
+        return "all_commercial_banks"
+    return None
+
+
+def _infer_loans(df: pd.DataFrame) -> pd.Series | None:
+    """Infer H.8 loans when source exposes bank credit and securities but not loans."""
+
+    credit = _coalesce_optional_column(
+        df,
+        [
+            "total_bank_credit",
+            "bank_credit_month_latest",
+            "bank_credit_monthly_avg",
+        ],
+    )
+    securities = _coalesce_optional_column(
+        df,
+        [
+            "securities_in_bank_credit_month_latest",
+            "securities_in_bank_credit_monthly_avg",
+            "bank_treasury_agency_securities",
+        ],
+    )
+    if credit is None or securities is None:
+        return None
+    return pd.to_numeric(credit, errors="coerce") - pd.to_numeric(securities, errors="coerce")
+
+
 def standardize_h8_input(df: pd.DataFrame) -> pd.DataFrame:
     """Return a canonical H.8 long-form dataframe from alias-tolerant input."""
 
     out = pd.DataFrame()
-    for target, aliases in H8_ALIASES.items():
-        out[target] = _coalesce_column(df, aliases, target)
+    out["date"] = _coalesce_column(df, H8_ALIASES["date"], "date")
+    bank_group = _coalesce_optional_column(df, H8_ALIASES["bank_group"])
+    if bank_group is None:
+        default_group = _default_bank_group(df)
+        if default_group is None:
+            raise ValueError(
+                "Could not find column for bank_group and no supported aggregate H.8 source "
+                "shape was detected"
+            )
+        out["bank_group"] = default_group
+    else:
+        out["bank_group"] = bank_group
+
+    out["securities_usd_millions"] = _coalesce_column(
+        df, H8_ALIASES["securities_usd_millions"], "securities_usd_millions"
+    )
+    out["deposits_usd_millions"] = _coalesce_column(
+        df, H8_ALIASES["deposits_usd_millions"], "deposits_usd_millions"
+    )
+    loans = _coalesce_optional_column(df, H8_ALIASES["loans_usd_millions"])
+    if loans is None:
+        loans = _infer_loans(df)
+    if loans is None:
+        raise ValueError(
+            "Could not find column for loans_usd_millions and could not infer loans from "
+            "total bank credit less securities in bank credit"
+        )
+    out["loans_usd_millions"] = loans
+    out["cash_assets_usd_millions"] = _coalesce_column(
+        df, H8_ALIASES["cash_assets_usd_millions"], "cash_assets_usd_millions"
+    )
 
     out["date"] = pd.to_datetime(out["date"], errors="coerce")
     if out["date"].isna().any():

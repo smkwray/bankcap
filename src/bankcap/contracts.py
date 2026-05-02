@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -160,7 +161,7 @@ def validate_contract(
             issues.append(f"{contract.project}:{artifact.id} missing {severity} artifact: {path}")
             continue
 
-        if strict_columns and path.suffix.lower() == ".csv" and artifact.required_columns:
+        if strict_columns and path.suffix.lower() == ".csv":
             try:
                 columns = set(pd.read_csv(path, nrows=5).columns)
             except Exception as exc:  # pragma: no cover - defensive branch
@@ -172,6 +173,12 @@ def validate_contract(
                     f"{contract.project}:{artifact.id} missing required columns {missing}; "
                     f"found {sorted(columns)}"
                 )
+            for target, aliases in artifact.accepted_column_aliases.items():
+                if not any(alias in columns for alias in aliases):
+                    issues.append(
+                        f"{contract.project}:{artifact.id} missing accepted alias for {target}; "
+                        f"accepted {aliases}; found {sorted(columns)}"
+                    )
     return issues
 
 
@@ -214,6 +221,22 @@ def import_contract_artifacts(
                 }
             )
             continue
+        if dest.exists() and not overwrite:
+            rows.append(
+                {
+                    "project": contract.project,
+                    "artifact_id": artifact.id,
+                    "source_path": str(src),
+                    "local_path": str(dest),
+                    "copied": False,
+                    "reason": "destination exists; pass --overwrite to refresh",
+                    "sha256": sha256_file(dest),
+                    "source_sha256": sha256_file(src),
+                    "source_mtime_utc": datetime.fromtimestamp(src.stat().st_mtime, UTC).isoformat(),
+                    "local_mtime_utc": datetime.fromtimestamp(dest.stat().st_mtime, UTC).isoformat(),
+                }
+            )
+            continue
         copied = copy_file(src, dest, overwrite=overwrite)
         rows.append(
             {
@@ -224,6 +247,9 @@ def import_contract_artifacts(
                 "copied": True,
                 "reason": "",
                 "sha256": sha256_file(copied),
+                "source_sha256": sha256_file(src),
+                "source_mtime_utc": datetime.fromtimestamp(src.stat().st_mtime, UTC).isoformat(),
+                "local_mtime_utc": datetime.fromtimestamp(copied.stat().st_mtime, UTC).isoformat(),
             }
         )
     return pd.DataFrame(rows)

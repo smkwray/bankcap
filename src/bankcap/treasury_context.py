@@ -20,12 +20,17 @@ CONTEXT_ALIASES = {
         "bill_issuance_share",
         "share_bills",
         "bills_share",
+        "bill_share_by_accepted_amount",
+        "raw_bill_share",
+        "liquid_bill_share",
     ],
     "wam_months": [
         "wam_months",
         "basis_wam_months",
         "fixed_baseline_wam_months",
         "weighted_average_maturity_months",
+        "raw_weighted_maturity_months",
+        "liquid_weighted_maturity_months",
     ],
     "gross_issuance_usd": [
         "gross_issuance_usd",
@@ -33,24 +38,45 @@ CONTEXT_ALIASES = {
         "issuance_usd",
         "gross_issuance",
         "total_issuance",
+        "accepted_amount_sum",
+        "offering_amount_sum",
     ],
-    "bill_issuance_usd": ["bill_issuance_usd", "bills_issuance_usd", "bill_gross_issuance_usd"],
-    "coupon_issuance_usd": ["coupon_issuance_usd", "coupons_issuance_usd", "coupon_gross_issuance_usd"],
+    "bill_issuance_usd": [
+        "bill_issuance_usd",
+        "bills_issuance_usd",
+        "bill_gross_issuance_usd",
+        "gross_bill_issuance",
+    ],
+    "coupon_issuance_usd": [
+        "coupon_issuance_usd",
+        "coupons_issuance_usd",
+        "coupon_gross_issuance_usd",
+        "coupon_issuance",
+    ],
     "liquidity_weighted_treasury_supply_usd": [
         "liquidity_weighted_treasury_supply_usd",
         "liquid_treasury_supply_usd",
         "liquidity_weighted_supply_usd",
         "fixed_baseline_liquid_supply_usd",
         "liquid_supply_usd",
+        "liquid_treasury_supply",
     ],
     "tga_change_usd_millions": [
         "tga_change_usd_millions",
         "d_tga_usd_millions",
         "tga_delta_usd_millions",
         "tga_change",
+        "d_tga",
     ],
-    "policy_rate_pct": ["policy_rate_pct", "fed_funds_target_pct", "iorb_pct", "effective_fed_funds_pct"],
-    "qt_qe_regime": ["qt_qe_regime", "balance_sheet_regime", "fed_balance_sheet_regime"],
+    "policy_rate_pct": [
+        "policy_rate_pct",
+        "fed_funds_target_pct",
+        "iorb_pct",
+        "iorb_rate",
+        "fed_funds",
+        "effective_fed_funds_pct",
+    ],
+    "qt_qe_regime": ["qt_qe_regime", "qe_qt_regime", "balance_sheet_regime", "fed_balance_sheet_regime"],
     "high_rate_regime": ["high_rate_regime", "is_high_rate_regime"],
     "slr_relief_window": ["slr_relief_window", "is_slr_relief_window"],
     "rate_duration_shock_window": [
@@ -115,13 +141,76 @@ def _period_from_series(series: pd.Series, frequency: str) -> pd.Series:
     return series.astype(str)
 
 
+def _aggregate_buycurve_issuance(raw: pd.DataFrame) -> pd.DataFrame:
+    if not {"month", "security_type", "accepted_amount_sum"}.issubset(raw.columns):
+        return raw
+    work = raw.copy()
+    work["accepted_amount_sum"] = pd.to_numeric(work["accepted_amount_sum"], errors="coerce")
+    work["weighted_maturity_years"] = pd.to_numeric(
+        work.get("weighted_maturity_years"), errors="coerce"
+    )
+    work["is_bill"] = work["security_type"].astype(str).str.lower().eq("bill")
+    grouped = work.groupby("month", as_index=False).agg(
+        gross_issuance_usd=("accepted_amount_sum", "sum"),
+        bill_issuance_usd=("accepted_amount_sum", lambda s: s[work.loc[s.index, "is_bill"]].sum()),
+        coupon_issuance_usd=(
+            "accepted_amount_sum",
+            lambda s: s[~work.loc[s.index, "is_bill"]].sum(),
+        ),
+    )
+    maturity = (
+        work.dropna(subset=["weighted_maturity_years", "accepted_amount_sum"])
+        .assign(weighted_maturity_amount=lambda x: x["weighted_maturity_years"] * x["accepted_amount_sum"])
+        .groupby("month", as_index=False)
+        .agg(weighted_maturity_amount=("weighted_maturity_amount", "sum"), weight=("accepted_amount_sum", "sum"))
+    )
+    grouped = grouped.merge(maturity, on="month", how="left")
+    grouped["wam_months"] = grouped["weighted_maturity_amount"] / grouped["weight"] * 12
+    grouped["bill_share"] = grouped["bill_issuance_usd"] / grouped["gross_issuance_usd"].replace({0: pd.NA})
+    return grouped.drop(columns=["weighted_maturity_amount", "weight"])
+
+
+def _select_tdcladder_measure(raw: pd.DataFrame) -> pd.DataFrame:
+    if not {"weight_family", "supply_basis"}.issubset(raw.columns):
+        return raw
+    work = raw.copy()
+    preferred = work[
+        work["weight_family"].astype(str).eq("fixed_baseline")
+        & work["supply_basis"].astype(str).eq("issuance_flow")
+    ]
+    if preferred.empty:
+        preferred = work[work["weight_family"].astype(str).eq("fixed_baseline")]
+    if preferred.empty:
+        preferred = work
+    out = preferred.copy()
+    if "raw_bill_share" in out.columns and "bill_share" not in out.columns:
+        out["bill_share"] = out["raw_bill_share"]
+    if "raw_weighted_maturity_years" in out.columns and "wam_months" not in out.columns:
+        out["wam_months"] = pd.to_numeric(out["raw_weighted_maturity_years"], errors="coerce") * 12
+    if "liquid_treasury_supply" in out.columns and "liquidity_weighted_treasury_supply_usd" not in out.columns:
+        out["liquidity_weighted_treasury_supply_usd"] = out["liquid_treasury_supply"]
+    return out
+
+
+def _prepare_context_source(raw: pd.DataFrame, source_name: str) -> pd.DataFrame:
+    if source_name == "buycurve":
+        return _aggregate_buycurve_issuance(raw)
+    if source_name == "tdcladder":
+        return _select_tdcladder_measure(raw)
+    if source_name == "liqsub" and "d_tga" not in raw.columns and "tga" in raw.columns:
+        out = raw.copy()
+        out["d_tga"] = pd.to_numeric(out["tga"], errors="coerce").diff()
+        return out
+    return raw
+
+
 def _standardize_context_frame(
     path: str | Path,
     *,
     source_name: str,
     frequency: str,
 ) -> pd.DataFrame:
-    raw = read_csv(path)
+    raw = _prepare_context_source(read_csv(path), source_name)
     period_col = _find_column(raw, CONTEXT_ALIASES["period"])
     if period_col is None:
         raise ValueError(f"{source_name} context file has no period column: {path}")

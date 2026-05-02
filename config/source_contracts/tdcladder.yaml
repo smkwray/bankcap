@@ -23,13 +23,19 @@ artifacts:
       - liquidity_weighted_treasury_supply_usd
     accepted_column_aliases:
       period: [month, date, period]
-      bill_share: [bill_share, basis_bill_share, fixed_baseline_bill_share]
-      wam_months: [wam_months, basis_wam_months, fixed_baseline_wam_months]
+      bill_share: [bill_share, basis_bill_share, fixed_baseline_bill_share, raw_bill_share, liquid_bill_share]
+      wam_months:
+        - wam_months
+        - basis_wam_months
+        - fixed_baseline_wam_months
+        - raw_weighted_maturity_years
+        - liquid_weighted_maturity_years
       liquidity_weighted_treasury_supply_usd:
         - liquidity_weighted_treasury_supply_usd
         - liquid_treasury_supply_usd
         - fixed_baseline_liquid_supply_usd
         - liquidity_weighted_supply_usd
+        - liquid_treasury_supply
   - id: monthly_episode_design
     path: output/tables/monthly_episode_design.csv
     local_path: data/imported/tdcladder/monthly_episode_design.csv
