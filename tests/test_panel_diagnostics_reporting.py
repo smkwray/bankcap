@@ -106,6 +106,7 @@ def test_cli_write_mechanism_package(tmp_path):
     diag_dir = tmp_path / "diagnostics"
     report = tmp_path / "reports" / "go_no_go.md"
     memo = tmp_path / "reports" / "memo.md"
+    manifest = tmp_path / "reports" / "manifest.csv"
     figures_dir = tmp_path / "figures"
     rc = main(
         [
@@ -118,6 +119,8 @@ def test_cli_write_mechanism_package(tmp_path):
             str(report),
             "--memo",
             str(memo),
+            "--manifest",
+            str(manifest),
             "--figures-dir",
             str(figures_dir),
             "--event-window",
@@ -129,5 +132,7 @@ def test_cli_write_mechanism_package(tmp_path):
     assert (diag_dir / "relative_bill_share_cutoff_sensitivity.csv").exists()
     assert report.exists()
     assert memo.exists()
+    assert manifest.exists()
+    assert "claim_boundary" in manifest.read_text()
     assert (figures_dir / "h8_ratio_trends.svg").exists()
     assert (figures_dir / "relative_bill_share_contrasts.svg").exists()

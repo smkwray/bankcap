@@ -145,6 +145,7 @@ bankcap write-mechanism-package \
   --diagnostics-dir output/diagnostics \
   --report output/reports/h8_go_no_go_report.md \
   --memo output/reports/h8_mechanism_screen_memo.md \
+  --manifest output/reports/h8_mechanism_package_manifest.csv \
   --figures-dir output/figures
 ```
 
@@ -156,6 +157,9 @@ The diagnostics preserve fixed bill-heavy/coupon-heavy flags, add relative high-
 bucket tables, write a cutoff-sensitivity table for nearby relative bill-share splits, and summarize
 configured event-window contrasts. The relative buckets are the safer first-pass comparison when
 fixed coupon-heavy months have little or no support.
+
+`write-mechanism-package` also writes `h8_mechanism_package_manifest.csv`, an index of the package
+inputs and outputs with claim-boundary notes.
 
 ## Required claim boundary
 

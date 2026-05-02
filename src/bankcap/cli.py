@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 from pathlib import Path
 
 from bankcap import __version__
@@ -17,6 +18,7 @@ from bankcap.diagnostics import run_first_pass_diagnostics
 from bankcap.figures import write_mechanism_figures
 from bankcap.h8 import build_h8_bank_group_panel
 from bankcap.h8_ddp import build_target_group_h8_input, download_target_group_packages
+from bankcap.io import ensure_parent
 from bankcap.panel import build_analysis_panel
 from bankcap.reporting import write_go_no_go_report, write_mechanism_memo
 from bankcap.treasury_context import build_treasury_context
@@ -110,6 +112,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--report", default="output/reports/h8_go_no_go_report.md")
     p.add_argument("--memo", default="output/reports/h8_mechanism_screen_memo.md")
     p.add_argument("--figures-dir", default="output/figures")
+    p.add_argument("--manifest", default="output/reports/h8_mechanism_package_manifest.csv")
     p.add_argument("--event-window", type=int, default=3)
 
     return parser
@@ -168,6 +171,65 @@ def _cmd_copy_sibling_outputs(args: argparse.Namespace) -> int:
     copied = int(manifest.get("copied", []).sum()) if not manifest.empty else 0
     print(f"Copied {copied} artifact(s) for {args.sibling}")
     return 0
+
+
+def _write_mechanism_package_manifest(
+    *,
+    panel_path: str | Path,
+    diagnostics: dict[str, Path],
+    report_path: Path,
+    memo_path: Path,
+    figures: dict[str, Path],
+    manifest_path: str | Path,
+) -> Path:
+    out = ensure_parent(manifest_path)
+    rows = [
+        {
+            "category": "input",
+            "name": "analysis_panel",
+            "path": str(panel_path),
+            "claim_boundary": "H.8 mechanism context; not bank-level identification",
+        }
+    ]
+    rows.extend(
+        {
+            "category": "diagnostic",
+            "name": name,
+            "path": str(path),
+            "claim_boundary": "descriptive mechanism screen; not causal absorption evidence",
+        }
+        for name, path in sorted(diagnostics.items())
+    )
+    rows.extend(
+        [
+            {
+                "category": "report",
+                "name": "go_no_go_report",
+                "path": str(report_path),
+                "claim_boundary": "screening recommendation; not authorization for bank-level claims",
+            },
+            {
+                "category": "report",
+                "name": "mechanism_memo",
+                "path": str(memo_path),
+                "claim_boundary": "descriptive mechanism memo; not bank-level identification",
+            },
+        ]
+    )
+    rows.extend(
+        {
+            "category": "figure",
+            "name": name,
+            "path": str(path),
+            "claim_boundary": "visual mechanism context; not causal absorption evidence",
+        }
+        for name, path in sorted(figures.items())
+    )
+    with out.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=["category", "name", "path", "claim_boundary"])
+        writer.writeheader()
+        writer.writerows(rows)
+    return out
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -277,12 +339,21 @@ def main(argv: list[str] | None = None) -> int:
             diagnostics_dir=args.diagnostics_dir,
             output_dir=args.figures_dir,
         )
+        manifest = _write_mechanism_package_manifest(
+            panel_path=args.panel,
+            diagnostics=diagnostics,
+            report_path=report,
+            memo_path=memo,
+            figures=figures,
+            manifest_path=args.manifest,
+        )
         print("Wrote mechanism package:")
         print(f"- diagnostics: {len(diagnostics)} table(s) in {args.diagnostics_dir}")
         print(f"- report: {report}")
         print(f"- memo: {memo}")
         for name, path in figures.items():
             print(f"- figure_{name}: {path}")
+        print(f"- manifest: {manifest}")
         return 0
 
     parser.print_help()

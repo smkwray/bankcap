@@ -86,4 +86,4 @@ screen for nearby relative bill-share cutoffs, plus `event_window_summary.csv` a
 `event_window_contrasts.csv` for configured policy/stress windows.
 
 `write-mechanism-package` is a post-panel convenience wrapper. It reruns diagnostics and writes the
-go/no-go report, mechanism memo, and SVG figures from the same panel.
+go/no-go report, mechanism memo, SVG figures, and a package manifest from the same panel.
