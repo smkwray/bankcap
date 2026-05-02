@@ -5,6 +5,15 @@ unless a gap is documented.
 
 ## Required first-pass sources
 
+### Federal Reserve H.8
+
+Use the H.8 Data Download Program target-group packages for large domestically chartered banks, small
+domestically chartered banks, and foreign-related institutions. These packages fill the target
+bank-group gap that sibling outputs do not cover.
+
+Guardrail: H.8 group aggregates are mechanism context, not bank-level identification. Securities are
+Treasury-and-agency securities, not pure Treasury holdings.
+
 ### buycurve
 
 Use for issuance composition, bill share, maturity buckets, buyer shares, and auction-to-holder H.8

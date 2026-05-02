@@ -82,6 +82,7 @@ H8_ALIASES = {
         "cash_assets_month_latest",
         "cash_assets_monthly_avg",
     ],
+    "h8_security_label": ["h8_security_label", "security_label"],
 }
 
 LEVEL_COLUMNS = [
@@ -201,6 +202,9 @@ def standardize_h8_input(df: pd.DataFrame) -> pd.DataFrame:
     out["cash_assets_usd_millions"] = _coalesce_column(
         df, H8_ALIASES["cash_assets_usd_millions"], "cash_assets_usd_millions"
     )
+    security_label = _coalesce_optional_column(df, H8_ALIASES["h8_security_label"])
+    if security_label is not None:
+        out["h8_security_label"] = security_label
 
     out["date"] = pd.to_datetime(out["date"], errors="coerce")
     if out["date"].isna().any():
@@ -255,7 +259,10 @@ def add_ratios_and_changes(df: pd.DataFrame) -> pd.DataFrame:
 
     for column in LEVEL_COLUMNS + RATIO_COLUMNS:
         out[f"d_{column}"] = out.groupby("bank_group")[column].diff()
-    out["h8_security_label"] = SECURITY_LABEL
+    if "h8_security_label" not in out.columns:
+        out["h8_security_label"] = SECURITY_LABEL
+    else:
+        out["h8_security_label"] = out["h8_security_label"].fillna(SECURITY_LABEL)
     return out
 
 

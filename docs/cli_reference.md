@@ -33,8 +33,28 @@ Copied files are ignored by git.
 bankcap build-h8-panel --input <h8-long-form.csv> --output data/derived/h8_bank_group_panel.csv --frequency monthly
 ```
 
-The seed accepts long-form H.8-style data. The next implementation tranche should adapt real imported
-H.8 columns into this canonical shape.
+The builder accepts long-form H.8-style data with date, bank group, securities, deposits, loans, and
+cash assets. It also accepts the normalized Federal Reserve H.8 target-group input produced below.
+
+## Download and normalize H.8 target groups
+
+```bash
+bankcap download-h8-target-groups \
+  --overwrite \
+  --manifest data/raw/h8_ddp/download_manifest.csv
+
+bankcap build-h8-target-input \
+  --input-dir data/raw/h8_ddp \
+  --output data/imported/h8_fed/target_group_h8_monthly_sa.csv
+
+bankcap build-h8-panel \
+  --input data/imported/h8_fed/target_group_h8_monthly_sa.csv \
+  --output data/derived/h8_bank_group_panel.csv \
+  --frequency monthly
+```
+
+The downloaded DDP packages and normalized local extract are ignored by git. The normalized H.8
+extract keeps only complete rows for required H.8 levels.
 
 ## Build Treasury context
 

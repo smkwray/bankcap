@@ -24,34 +24,53 @@ TARGET_H8_GROUPS = {
 }
 
 
+def _target_common_panel(panel: pd.DataFrame) -> pd.DataFrame:
+    if "period" not in panel.columns or "bank_group" not in panel.columns:
+        return panel.iloc[0:0].copy()
+    target = panel.loc[panel["bank_group"].astype(str).isin(TARGET_H8_GROUPS)].copy()
+    group_counts = target.groupby("period")["bank_group"].nunique()
+    common_periods = group_counts[group_counts == len(TARGET_H8_GROUPS)].index
+    return target.loc[target["period"].isin(common_periods)].copy()
+
+
 def _diagnostic_signal(panel: pd.DataFrame) -> tuple[str, list[str]]:
     periods = panel["period"].nunique() if "period" in panel.columns else 0
     groups = panel["bank_group"].nunique() if "bank_group" in panel.columns else 0
     observed_groups = set(panel["bank_group"].dropna().astype(str)) if "bank_group" in panel.columns else set()
     target_groups = len(observed_groups.intersection(TARGET_H8_GROUPS))
+    target_common = _target_common_panel(panel)
+    target_common_periods = target_common["period"].nunique() if len(target_common) else 0
     context_complete = (
-        float(panel.get("is_context_complete", pd.Series(False, index=panel.index)).mean())
-        if len(panel)
+        float(target_common.get("is_context_complete", pd.Series(False, index=target_common.index)).mean())
+        if len(target_common)
         else 0.0
     )
+    bill_variation_frame = target_common if len(target_common) else panel
     bill_variation = (
-        panel.get("bill_heavy_month", pd.Series(False, index=panel.index)).nunique() > 1
-        or panel.get("coupon_heavy_month", pd.Series(False, index=panel.index)).nunique() > 1
+        bill_variation_frame.get(
+            "bill_heavy_month", pd.Series(False, index=bill_variation_frame.index)
+        ).nunique()
+        > 1
+        or bill_variation_frame.get(
+            "coupon_heavy_month", pd.Series(False, index=bill_variation_frame.index)
+        ).nunique()
+        > 1
     )
 
     reasons = [
         f"sample periods: {periods}",
         f"bank groups observed: {groups}",
         f"target H.8 groups observed: {target_groups} of {len(TARGET_H8_GROUPS)}",
-        f"context-complete row share: {context_complete:.2f}",
-        f"bill/coupon context variation present: {bill_variation}",
+        f"common target-group periods: {target_common_periods}",
+        f"common-sample context-complete row share: {context_complete:.2f}",
+        f"common-sample bill/coupon context variation present: {bill_variation}",
     ]
     if target_groups == 0:
         reasons.append("current H.8 reuse is aggregate-only; large/small/foreign split is still missing")
         return "NO-GO for heavy bank-level ingestion until target H.8 group coverage is available", reasons
-    if periods >= 24 and target_groups >= 3 and context_complete >= 0.75 and bill_variation:
+    if target_common_periods >= 24 and target_groups >= 3 and context_complete >= 0.75 and bill_variation:
         return "PROVISIONAL GO for a scoped bank-level design memo", reasons
-    if periods >= 12 and target_groups >= 2 and bill_variation:
+    if target_common_periods >= 12 and target_groups >= 2 and bill_variation:
         return "PARTIAL GO: improve coverage before Call Report or FR Y-9C ingestion", reasons
     return "NO-GO for heavy bank-level ingestion until H.8 coverage/context improves", reasons
 

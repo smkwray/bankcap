@@ -96,8 +96,16 @@ bankcap copy-sibling-outputs --sibling liqsub --source-root "$LIQSUB_ROOT" --req
 Build the seed panels:
 
 ```bash
+bankcap download-h8-target-groups \
+  --overwrite \
+  --manifest data/raw/h8_ddp/download_manifest.csv
+
+bankcap build-h8-target-input \
+  --input-dir data/raw/h8_ddp \
+  --output data/imported/h8_fed/target_group_h8_monthly_sa.csv
+
 bankcap build-h8-panel \
-  --input data/imported/liqsub/weekly_liquidity_substitution_panel.csv \
+  --input data/imported/h8_fed/target_group_h8_monthly_sa.csv \
   --output data/derived/h8_bank_group_panel.csv \
   --frequency monthly
 
@@ -122,9 +130,9 @@ bankcap write-go-no-go-report \
   --output output/reports/h8_go_no_go_report.md
 ```
 
-The H.8 builder currently expects a long-form bank-group input with date, group, securities, deposits,
-loans, and cash assets. The next implementation tranche should map actual imported H.8/liqsub column
-names into that canonical shape if the sibling panel uses a wider format.
+The H.8 target-group workflow downloads Federal Reserve DDP packages into ignored `data/raw/`,
+normalizes complete monthly rows into ignored `data/imported/h8_fed/`, and then builds the derived
+panel.
 
 ## Required claim boundary
 

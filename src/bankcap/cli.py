@@ -15,6 +15,7 @@ from bankcap.contracts import (
 )
 from bankcap.diagnostics import run_first_pass_diagnostics
 from bankcap.h8 import build_h8_bank_group_panel
+from bankcap.h8_ddp import build_target_group_h8_input, download_target_group_packages
 from bankcap.panel import build_analysis_panel
 from bankcap.reporting import write_go_no_go_report
 from bankcap.treasury_context import build_treasury_context
@@ -55,6 +56,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--output", default="data/derived/h8_bank_group_panel.csv")
     p.add_argument("--frequency", choices=["monthly", "weekly"], default="monthly")
     p.add_argument("--monthly-method", choices=["last", "mean"], default="last")
+
+    p = sub.add_parser("download-h8-target-groups", help="Download Fed H.8 target-group DDP packages.")
+    p.add_argument("--output-dir", default="data/raw/h8_ddp")
+    p.add_argument("--overwrite", action="store_true")
+    p.add_argument("--manifest", default="data/raw/h8_ddp/download_manifest.csv")
+
+    p = sub.add_parser("build-h8-target-input", help="Normalize Fed H.8 target-group DDP packages.")
+    p.add_argument("--input-dir", default="data/raw/h8_ddp")
+    p.add_argument("--output", default="data/imported/h8_fed/target_group_h8_monthly_sa.csv")
 
     p = sub.add_parser("build-treasury-context", help="Build first-pass Treasury context from sibling outputs.")
     p.add_argument("--buycurve", default=None)
@@ -162,6 +172,20 @@ def main(argv: list[str] | None = None) -> int:
             monthly_method=args.monthly_method,
         )
         print(f"Wrote {len(panel)} rows: {args.output}")
+        return 0
+    if args.command == "download-h8-target-groups":
+        manifest = download_target_group_packages(args.output_dir, overwrite=args.overwrite)
+        if args.manifest:
+            manifest_path = Path(args.manifest)
+            manifest_path.parent.mkdir(parents=True, exist_ok=True)
+            manifest.to_csv(manifest_path, index=False)
+            print(f"Wrote manifest: {manifest_path}")
+        downloaded = int(manifest["downloaded"].sum()) if not manifest.empty else 0
+        print(f"Downloaded {downloaded} H.8 target-group package(s)")
+        return 0
+    if args.command == "build-h8-target-input":
+        h8_input = build_target_group_h8_input(args.input_dir, args.output)
+        print(f"Wrote {len(h8_input)} rows: {args.output}")
         return 0
     if args.command == "build-treasury-context":
         context = build_treasury_context(
