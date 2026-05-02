@@ -147,3 +147,24 @@ def test_cli_validate_mechanism_package_rejects_missing_artifact(tmp_path):
     )
     rc = main(["validate-mechanism-package", "--manifest", str(manifest), "--project-root", str(tmp_path)])
     assert rc == 1
+
+
+def test_cli_validate_mechanism_package_rejects_report_without_boundary(tmp_path):
+    report = tmp_path / "report.md"
+    report.write_text("This report has no required boundary language.\n")
+    panel = tmp_path / "panel.csv"
+    panel.write_text("period,bank_group\n")
+    diagnostic = tmp_path / "diagnostic.csv"
+    diagnostic.write_text("x\n1\n")
+    figure = tmp_path / "figure.svg"
+    figure.write_text("<svg></svg>")
+    manifest = tmp_path / "manifest.csv"
+    manifest.write_text(
+        "category,name,path,claim_boundary\n"
+        "input,analysis_panel,panel.csv,H.8 mechanism context only\n"
+        "diagnostic,sample_summary,diagnostic.csv,descriptive only\n"
+        "report,go_no_go_report,report.md,not authorization for bank-level claims\n"
+        "figure,ratio_trends,figure.svg,visual mechanism context only\n"
+    )
+    rc = main(["validate-mechanism-package", "--manifest", str(manifest), "--project-root", str(tmp_path)])
+    assert rc == 1

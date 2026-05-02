@@ -290,6 +290,12 @@ def _validate_mechanism_package_manifest(
             artifact_path = root / artifact_path
         if not artifact_path.exists():
             issues.append(f"row {idx} artifact does not exist: {path_text}")
+        elif category == "report":
+            text = artifact_path.read_text(encoding="utf-8").lower()
+            if "claim boundary" not in text and "interpretation boundary" not in text:
+                issues.append(f"row {idx} report is missing claim/interpretation boundary: {path_text}")
+            if "not bank-level" not in text and "does not identify" not in text:
+                issues.append(f"row {idx} report is missing bank-level limitation language: {path_text}")
         if not claim_boundary:
             issues.append(f"row {idx} has empty claim_boundary")
 

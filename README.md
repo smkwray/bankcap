@@ -163,7 +163,7 @@ fixed coupon-heavy months have little or no support.
 
 `write-mechanism-package` also writes `h8_mechanism_package_manifest.csv`, an index of the package
 inputs and outputs with claim-boundary notes. `validate-mechanism-package` checks that the indexed
-artifacts exist and keep those claim-boundary notes populated.
+artifacts exist, claim-boundary notes are populated, and report text keeps boundary language.
 
 ## Required claim boundary
 
