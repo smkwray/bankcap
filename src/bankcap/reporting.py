@@ -221,6 +221,39 @@ def _sample_warning(sample_summary: pd.DataFrame) -> str:
     return " ".join(warnings)
 
 
+def _relative_stability_read(relative_contrasts: pd.DataFrame) -> str:
+    if relative_contrasts.empty:
+        return "Relative high-bill and low-bill stability could not be evaluated."
+    common = relative_contrasts.loc[relative_contrasts["sample"].eq("common_target_periods")]
+    if common.empty:
+        return "Relative high-bill and low-bill stability could not be evaluated in the common sample."
+    level_outcomes = common.loc[
+        common["outcome_change"].isin(
+            [
+                "d_securities_usd_millions",
+                "d_deposits_usd_millions",
+                "d_loans_usd_millions",
+                "d_cash_assets_usd_millions",
+            ]
+        )
+    ]
+    stable = int(level_outcomes["same_sign_as_other_sample"].sum())
+    total = int(len(level_outcomes))
+    loan_rows = level_outcomes.loc[level_outcomes["outcome_change"].eq("d_loans_usd_millions")]
+    loans_stable = bool(len(loan_rows) and loan_rows["same_sign_as_other_sample"].all())
+    if stable == total and total:
+        return "Relative high-bill versus low-bill signs are stable across common and TGA-complete samples."
+    if loans_stable:
+        return (
+            f"Relative high-bill versus low-bill signs are mixed ({stable} of {total} level contrasts "
+            "match across samples), though loan-growth signs are stable for all target groups."
+        )
+    return (
+        f"Relative high-bill versus low-bill signs are mixed ({stable} of {total} level contrasts "
+        "match across samples)."
+    )
+
+
 def write_mechanism_memo(
     *,
     panel_path: str | Path,
@@ -255,6 +288,11 @@ def write_mechanism_memo(
     tga_relative_response = (
         read_csv(diag / "tga_complete_relative_bill_share_response_table.csv")
         if (diag / "tga_complete_relative_bill_share_response_table.csv").exists()
+        else pd.DataFrame()
+    )
+    relative_contrasts = (
+        read_csv(diag / "relative_bill_share_contrasts.csv")
+        if (diag / "relative_bill_share_contrasts.csv").exists()
         else pd.DataFrame()
     )
     trends = read_csv(diag / "bank_group_trends.csv") if (diag / "bank_group_trends.csv").exists() else pd.DataFrame()
@@ -300,11 +338,34 @@ def write_mechanism_memo(
     if not guarded_lines:
         guarded_lines = ["- No guarded regression table is available."]
 
+    contrast_lines = []
+    if not relative_contrasts.empty:
+        common_contrasts = relative_contrasts.loc[
+            relative_contrasts["sample"].eq("common_target_periods")
+            & relative_contrasts["outcome_change"].isin(
+                [
+                    "d_securities_usd_millions",
+                    "d_deposits_usd_millions",
+                    "d_loans_usd_millions",
+                    "d_cash_assets_usd_millions",
+                ]
+            )
+        ]
+        for _, row in common_contrasts.sort_values(["bank_group", "outcome_change"]).iterrows():
+            stable = "same sign in TGA-complete sample" if row["same_sign_as_other_sample"] else "sign changes in TGA-complete sample"
+            contrast_lines.append(
+                "- "
+                f"`{row['bank_group']}` `{row['outcome_change']}`: "
+                f"high-minus-low={_fmt_number(row['high_minus_low'], 1)}; {stable}"
+            )
+    if not contrast_lines:
+        contrast_lines = ["- No relative contrast table is available."]
+
     memo = f"""# H.8 Mechanism-Screen Memo
 
 ## Bottom line
 
-{recommendation}. {_sample_warning(sample_summary)}
+{recommendation}. {_sample_warning(sample_summary)} {_relative_stability_read(relative_contrasts)}
 
 ## Gate checks
 
@@ -342,6 +403,10 @@ TGA-complete common target-group sample ({tga_period_text}):
 
 {chr(10).join(_response_lines(tga_relative_response))}
 
+High-minus-low stability checks:
+
+{chr(10).join(contrast_lines)}
+
 ## Guarded bill-share screens
 
 {chr(10).join(guarded_lines)}
@@ -358,8 +423,9 @@ Report or FR Y-9C ingestion.
 1. Treat fixed-threshold coupon-heavy contrasts as unsupported under the current data.
 2. Use relative high-bill and low-bill buckets as the defensible first-pass composition comparison.
 3. Inspect the TGA-complete rows as a later-sample mechanism check, not a full historical result.
-4. If the pattern remains stable after a defensible context definition, draft a scoped bank-level design memo;
-   otherwise keep `bankcap` as an H.8 mechanism-context project.
+4. Keep `bankcap` as an H.8 mechanism-context project for now; do not start Call Report or FR Y-9C
+   ingestion until a separate design memo explains why the mixed stability pattern is still worth the
+   bank-level data cost.
 """
     out.write_text(memo, encoding="utf-8")
     return out

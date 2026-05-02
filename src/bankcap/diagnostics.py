@@ -203,6 +203,65 @@ def relative_bill_share_response_table(panel: pd.DataFrame) -> pd.DataFrame:
     return counts.merge(out, on=["bank_group", "relative_bill_share_bucket"], how="left")
 
 
+def relative_bill_share_contrast_table(
+    common_response: pd.DataFrame,
+    tga_response: pd.DataFrame,
+) -> pd.DataFrame:
+    """Compare high-minus-low relative bill-share responses across two samples."""
+
+    rows: list[dict[str, object]] = []
+    for sample_name, response in [
+        ("common_target_periods", common_response),
+        ("tga_complete_common_target_periods", tga_response),
+    ]:
+        if response.empty:
+            continue
+        for group, gdf in response.groupby("bank_group"):
+            high = gdf.loc[gdf["relative_bill_share_bucket"].eq("high_bill_share")]
+            low = gdf.loc[gdf["relative_bill_share_bucket"].eq("low_bill_share")]
+            if high.empty or low.empty:
+                continue
+            high_row = high.iloc[0]
+            low_row = low.iloc[0]
+            for outcome in [c for c in OUTCOME_CHANGE_COLUMNS if c in response.columns]:
+                diff = float(high_row[outcome] - low_row[outcome])
+                rows.append(
+                    {
+                        "sample": sample_name,
+                        "bank_group": group,
+                        "outcome_change": outcome,
+                        "high_bill_mean": float(high_row[outcome]),
+                        "low_bill_mean": float(low_row[outcome]),
+                        "high_minus_low": diff,
+                        "high_n": int(high_row["n_rows"]),
+                        "low_n": int(low_row["n_rows"]),
+                    }
+                )
+    contrasts = pd.DataFrame(rows)
+    if contrasts.empty:
+        return contrasts
+    common = contrasts.loc[contrasts["sample"].eq("common_target_periods")]
+    tga = contrasts.loc[contrasts["sample"].eq("tga_complete_common_target_periods")]
+    sign_map = {
+        (row.bank_group, row.outcome_change): 0
+        if row.high_minus_low == 0
+        else (1 if row.high_minus_low > 0 else -1)
+        for row in common.itertuples(index=False)
+    }
+    tga_sign_map = {
+        (row.bank_group, row.outcome_change): 0
+        if row.high_minus_low == 0
+        else (1 if row.high_minus_low > 0 else -1)
+        for row in tga.itertuples(index=False)
+    }
+    contrasts["same_sign_as_other_sample"] = contrasts.apply(
+        lambda row: sign_map.get((row["bank_group"], row["outcome_change"]))
+        == tga_sign_map.get((row["bank_group"], row["outcome_change"])),
+        axis=1,
+    )
+    return contrasts
+
+
 def correlation_table(panel: pd.DataFrame, *, min_obs: int = 4) -> pd.DataFrame:
     """Compute simple within-bank-group correlations between context variables and outcomes."""
 
@@ -334,6 +393,7 @@ def run_first_pass_diagnostics(
         / "common_target_relative_bill_share_response_table.csv",
         "tga_complete_relative_bill_share_response_table": out_dir
         / "tga_complete_relative_bill_share_response_table.csv",
+        "relative_bill_share_contrasts": out_dir / "relative_bill_share_contrasts.csv",
         "correlations": out_dir / "correlations.csv",
         "guarded_regressions": out_dir / "guarded_regressions.csv",
         "event_windows": out_dir / "event_windows.csv",
@@ -344,14 +404,11 @@ def run_first_pass_diagnostics(
     write_csv(bank_group_response_table(target_common_panel(panel)), outputs["common_target_response_table"])
     write_csv(bank_group_response_table(tga_complete_target_panel(panel)), outputs["tga_complete_response_table"])
     write_csv(relative_bill_share_response_table(panel), outputs["relative_bill_share_response_table"])
-    write_csv(
-        relative_bill_share_response_table(target_common_panel(panel)),
-        outputs["common_target_relative_bill_share_response_table"],
-    )
-    write_csv(
-        relative_bill_share_response_table(tga_complete_target_panel(panel)),
-        outputs["tga_complete_relative_bill_share_response_table"],
-    )
+    common_relative = relative_bill_share_response_table(target_common_panel(panel))
+    tga_relative = relative_bill_share_response_table(tga_complete_target_panel(panel))
+    write_csv(common_relative, outputs["common_target_relative_bill_share_response_table"])
+    write_csv(tga_relative, outputs["tga_complete_relative_bill_share_response_table"])
+    write_csv(relative_bill_share_contrast_table(common_relative, tga_relative), outputs["relative_bill_share_contrasts"])
     write_csv(correlation_table(panel), outputs["correlations"])
     write_csv(guarded_regression_table(panel), outputs["guarded_regressions"])
     write_csv(event_window_table(panel, window=event_window), outputs["event_windows"])
