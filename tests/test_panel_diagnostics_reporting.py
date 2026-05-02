@@ -41,6 +41,8 @@ def test_build_analysis_panel_and_diagnostics(tmp_path):
     assert outputs["common_target_relative_bill_share_response_table"].exists()
     assert outputs["tga_complete_relative_bill_share_response_table"].exists()
     assert outputs["relative_bill_share_contrasts"].exists()
+    assert outputs["relative_bill_share_cutoff_sensitivity"].exists()
+    assert outputs["relative_bill_share_cutoff_sensitivity"].read_text().startswith("low_quantile")
     assert outputs["sample_summary"].read_text().startswith("sample")
 
 
@@ -74,6 +76,7 @@ def test_write_mechanism_memo(tmp_path):
     assert "H.8 Mechanism-Screen Memo" in text
     assert "Relative high-bill and low-bill" in text
     assert "High-minus-low stability" in text
+    assert "Relative cutoff sensitivity" in text
     assert "Interpretation boundary" in text
     assert "H.8 mechanism context only" in text
 

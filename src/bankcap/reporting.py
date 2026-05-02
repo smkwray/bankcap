@@ -386,6 +386,23 @@ def _relative_stability_read(relative_contrasts: pd.DataFrame) -> str:
     )
 
 
+def _cutoff_sensitivity_lines(sensitivity: pd.DataFrame) -> list[str]:
+    if sensitivity.empty:
+        return ["- No relative cutoff sensitivity table is available."]
+    lines = []
+    for _, row in sensitivity.sort_values(["low_quantile", "high_quantile"]).iterrows():
+        lines.append(
+            "- "
+            f"q{_fmt_number(row.get('low_quantile'), 2)}/q{_fmt_number(row.get('high_quantile'), 2)}: "
+            f"common high/low rows={int(row.get('common_high_rows', 0))}/"
+            f"{int(row.get('common_low_rows', 0))}, "
+            f"stable level contrasts={int(row.get('stable_level_contrasts', 0))}/"
+            f"{int(row.get('total_level_contrasts', 0))}, "
+            f"loan signs stable={bool(row.get('loan_growth_signs_stable', False))}"
+        )
+    return lines
+
+
 def write_mechanism_memo(
     *,
     panel_path: str | Path,
@@ -425,6 +442,11 @@ def write_mechanism_memo(
     relative_contrasts = (
         read_csv(diag / "relative_bill_share_contrasts.csv")
         if (diag / "relative_bill_share_contrasts.csv").exists()
+        else pd.DataFrame()
+    )
+    cutoff_sensitivity = (
+        read_csv(diag / "relative_bill_share_cutoff_sensitivity.csv")
+        if (diag / "relative_bill_share_cutoff_sensitivity.csv").exists()
         else pd.DataFrame()
     )
     trends = read_csv(diag / "bank_group_trends.csv") if (diag / "bank_group_trends.csv").exists() else pd.DataFrame()
@@ -538,6 +560,10 @@ TGA-complete common target-group sample ({tga_period_text}):
 High-minus-low stability checks:
 
 {chr(10).join(contrast_lines)}
+
+Relative cutoff sensitivity:
+
+{chr(10).join(_cutoff_sensitivity_lines(cutoff_sensitivity))}
 
 ## Guarded bill-share screens
 

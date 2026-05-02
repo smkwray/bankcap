@@ -144,9 +144,10 @@ The H.8 target-group workflow downloads Federal Reserve DDP packages into ignore
 normalizes complete monthly rows into ignored `data/imported/h8_fed/`, and then builds the derived
 panel.
 
-The diagnostics preserve fixed bill-heavy/coupon-heavy flags and add relative high-bill/low-bill
-bucket tables. The relative buckets are the safer first-pass comparison when fixed coupon-heavy
-months have little or no support.
+The diagnostics preserve fixed bill-heavy/coupon-heavy flags, add relative high-bill/low-bill
+bucket tables, and write a cutoff-sensitivity table for nearby relative bill-share splits. The
+relative buckets are the safer first-pass comparison when fixed coupon-heavy months have little or
+no support.
 
 ## Required claim boundary
 

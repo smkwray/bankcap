@@ -41,6 +41,12 @@ TARGET_H8_GROUPS = {
     "foreign_related_institutions",
 }
 
+RELATIVE_BUCKET_SENSITIVITY_GRID = [
+    (0.20, 0.80),
+    (0.25, 0.75),
+    (0.33, 0.67),
+]
+
 
 def bank_group_trends(panel: pd.DataFrame) -> pd.DataFrame:
     """Summarize levels and sample coverage by H.8 bank group."""
@@ -262,6 +268,128 @@ def relative_bill_share_contrast_table(
     return contrasts
 
 
+def _panel_with_relative_bill_share_cutoffs(
+    panel: pd.DataFrame,
+    *,
+    low_quantile: float,
+    high_quantile: float,
+) -> pd.DataFrame:
+    """Return a panel copy with relative bill-share buckets recomputed from supplied cutoffs."""
+
+    out = panel.copy()
+    if "bill_share" not in out.columns:
+        out["high_bill_share_month"] = False
+        out["low_bill_share_month"] = False
+        out["bill_share_bucket"] = "missing"
+        return out
+    bill_share = pd.to_numeric(out["bill_share"], errors="coerce")
+    periods = out["period"] if "period" in out.columns else pd.Series(out.index, index=out.index)
+    period_bill_share = pd.DataFrame({"period": periods, "bill_share": bill_share})
+    valid = period_bill_share.dropna(subset=["bill_share"]).drop_duplicates("period")["bill_share"]
+    if valid.empty:
+        out["high_bill_share_month"] = False
+        out["low_bill_share_month"] = False
+        out["bill_share_bucket"] = "missing"
+        return out
+    low_cut = float(valid.quantile(low_quantile))
+    high_cut = float(valid.quantile(high_quantile))
+    out["low_bill_share_month"] = bill_share <= low_cut
+    out["high_bill_share_month"] = bill_share >= high_cut
+    out["bill_share_bucket"] = "middle_bill_share"
+    out.loc[out["low_bill_share_month"], "bill_share_bucket"] = "low_bill_share"
+    out.loc[out["high_bill_share_month"], "bill_share_bucket"] = "high_bill_share"
+    out.loc[bill_share.isna(), "bill_share_bucket"] = "missing"
+    out["relative_low_bill_share_cutoff"] = low_cut
+    out["relative_high_bill_share_cutoff"] = high_cut
+    return out
+
+
+def relative_bill_share_cutoff_sensitivity_table(
+    panel: pd.DataFrame,
+    *,
+    quantile_grid: list[tuple[float, float]] | None = None,
+) -> pd.DataFrame:
+    """Summarize support and sign stability across alternative relative bill-share cutoffs."""
+
+    rows: list[dict[str, object]] = []
+    grid = quantile_grid or RELATIVE_BUCKET_SENSITIVITY_GRID
+    for low_q, high_q in grid:
+        if low_q >= high_q:
+            raise ValueError("Relative bill-share low quantile must be below high quantile")
+        bucketed = _panel_with_relative_bill_share_cutoffs(
+            panel,
+            low_quantile=low_q,
+            high_quantile=high_q,
+        )
+        common = target_common_panel(bucketed)
+        tga = tga_complete_target_panel(bucketed)
+        common_response = relative_bill_share_response_table(common)
+        tga_response = relative_bill_share_response_table(tga)
+        contrasts = relative_bill_share_contrast_table(common_response, tga_response)
+        common_contrasts = contrasts.loc[contrasts["sample"].eq("common_target_periods")] if not contrasts.empty else contrasts
+        level = (
+            common_contrasts.loc[
+                common_contrasts["outcome_change"].isin(
+                    [
+                        "d_securities_usd_millions",
+                        "d_deposits_usd_millions",
+                        "d_loans_usd_millions",
+                        "d_cash_assets_usd_millions",
+                    ]
+                )
+            ]
+            if not common_contrasts.empty
+            else common_contrasts
+        )
+        loans = (
+            level.loc[level["outcome_change"].eq("d_loans_usd_millions")]
+            if not level.empty
+            else level
+        )
+        support = sample_summary_table(bucketed)
+        common_all = support.loc[
+            support["sample"].eq("common_target_periods")
+            & support["bank_group"].eq("all_target_groups")
+        ]
+        if common_all.empty:
+            high_rows = low_rows = middle_rows = 0
+        else:
+            support_row = common_all.iloc[0]
+            high_rows = int(support_row.get("high_bill_share_rows", 0))
+            low_rows = int(support_row.get("low_bill_share_rows", 0))
+            middle_rows = int(support_row.get("middle_bill_share_rows", 0))
+        low_cutoff = (
+            float(bucketed["relative_low_bill_share_cutoff"].dropna().iloc[0])
+            if "relative_low_bill_share_cutoff" in bucketed
+            and bucketed["relative_low_bill_share_cutoff"].notna().any()
+            else pd.NA
+        )
+        high_cutoff = (
+            float(bucketed["relative_high_bill_share_cutoff"].dropna().iloc[0])
+            if "relative_high_bill_share_cutoff" in bucketed
+            and bucketed["relative_high_bill_share_cutoff"].notna().any()
+            else pd.NA
+        )
+        rows.append(
+            {
+                "low_quantile": low_q,
+                "high_quantile": high_q,
+                "low_bill_share_cutoff": low_cutoff,
+                "high_bill_share_cutoff": high_cutoff,
+                "common_high_rows": high_rows,
+                "common_low_rows": low_rows,
+                "common_middle_rows": middle_rows,
+                "stable_level_contrasts": int(level["same_sign_as_other_sample"].sum()) if not level.empty else 0,
+                "total_level_contrasts": int(len(level)),
+                "loan_growth_signs_stable": bool(
+                    len(loans) and loans["same_sign_as_other_sample"].fillna(False).astype(bool).all()
+                ),
+                "claim_warning": "descriptive cutoff sensitivity; not causal absorption evidence",
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def correlation_table(panel: pd.DataFrame, *, min_obs: int = 4) -> pd.DataFrame:
     """Compute simple within-bank-group correlations between context variables and outcomes."""
 
@@ -394,6 +522,7 @@ def run_first_pass_diagnostics(
         "tga_complete_relative_bill_share_response_table": out_dir
         / "tga_complete_relative_bill_share_response_table.csv",
         "relative_bill_share_contrasts": out_dir / "relative_bill_share_contrasts.csv",
+        "relative_bill_share_cutoff_sensitivity": out_dir / "relative_bill_share_cutoff_sensitivity.csv",
         "correlations": out_dir / "correlations.csv",
         "guarded_regressions": out_dir / "guarded_regressions.csv",
         "event_windows": out_dir / "event_windows.csv",
@@ -409,6 +538,7 @@ def run_first_pass_diagnostics(
     write_csv(common_relative, outputs["common_target_relative_bill_share_response_table"])
     write_csv(tga_relative, outputs["tga_complete_relative_bill_share_response_table"])
     write_csv(relative_bill_share_contrast_table(common_relative, tga_relative), outputs["relative_bill_share_contrasts"])
+    write_csv(relative_bill_share_cutoff_sensitivity_table(panel), outputs["relative_bill_share_cutoff_sensitivity"])
     write_csv(correlation_table(panel), outputs["correlations"])
     write_csv(guarded_regression_table(panel), outputs["guarded_regressions"])
     write_csv(event_window_table(panel, window=event_window), outputs["event_windows"])

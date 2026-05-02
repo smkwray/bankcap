@@ -79,3 +79,6 @@ bankcap write-go-no-go-report
 bankcap write-mechanism-memo
 bankcap write-mechanism-figures
 ```
+
+`run-diagnostics` also writes `relative_bill_share_cutoff_sensitivity.csv`, a descriptive robustness
+screen for nearby relative bill-share cutoffs.
