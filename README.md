@@ -5,6 +5,10 @@ duration-constraint diagnostics**. The first implementation is a low-cost
 **Federal Reserve H.8 bank-group mechanism screen**, not a Call Report or FR Y-9C
 bank-level project.
 
+TDC means the **Treasury Deposit Channel**: the estimated deposit movement linked
+to Treasury cash and debt operations. The upstream TDC estimator is
+[`smkwray/tdcest`](https://github.com/smkwray/tdcest).
+
 Project status: the H.8 mechanism screen is complete as descriptive mechanism context. Current
 outputs support a partial-go package for H.8 evidence only; bank-level ingestion remains blocked.
 See `docs/h8_mechanism_package.md` for the final package status and interpretation boundary.
