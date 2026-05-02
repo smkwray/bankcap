@@ -147,6 +147,9 @@ bankcap write-mechanism-package \
   --memo output/reports/h8_mechanism_screen_memo.md \
   --manifest output/reports/h8_mechanism_package_manifest.csv \
   --figures-dir output/figures
+
+bankcap validate-mechanism-package \
+  --manifest output/reports/h8_mechanism_package_manifest.csv
 ```
 
 The H.8 target-group workflow downloads Federal Reserve DDP packages into ignored `data/raw/`,
@@ -159,7 +162,8 @@ configured event-window contrasts. The relative buckets are the safer first-pass
 fixed coupon-heavy months have little or no support.
 
 `write-mechanism-package` also writes `h8_mechanism_package_manifest.csv`, an index of the package
-inputs and outputs with claim-boundary notes.
+inputs and outputs with claim-boundary notes. `validate-mechanism-package` checks that the indexed
+artifacts exist and keep those claim-boundary notes populated.
 
 ## Required claim boundary
 

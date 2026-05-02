@@ -115,6 +115,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--manifest", default="output/reports/h8_mechanism_package_manifest.csv")
     p.add_argument("--event-window", type=int, default=3)
 
+    p = sub.add_parser(
+        "validate-mechanism-package",
+        help="Validate the generated mechanism package manifest and listed artifacts.",
+    )
+    p.add_argument("--manifest", default="output/reports/h8_mechanism_package_manifest.csv")
+    p.add_argument("--project-root", default=".")
+
     return parser
 
 
@@ -232,6 +239,66 @@ def _write_mechanism_package_manifest(
     return out
 
 
+def _validate_mechanism_package_manifest(
+    *,
+    manifest_path: str | Path,
+    project_root: str | Path = ".",
+) -> list[str]:
+    manifest = Path(manifest_path)
+    root = Path(project_root)
+    issues: list[str] = []
+    if not manifest.exists():
+        return [f"mechanism package manifest not found: {manifest}"]
+
+    with manifest.open(newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        required = {"category", "name", "path", "claim_boundary"}
+        if reader.fieldnames is None:
+            return [f"mechanism package manifest has no header: {manifest}"]
+        missing = required.difference(reader.fieldnames)
+        if missing:
+            issues.append(f"mechanism package manifest missing columns: {', '.join(sorted(missing))}")
+            return issues
+        rows = list(reader)
+
+    if not rows:
+        issues.append(f"mechanism package manifest has no artifact rows: {manifest}")
+        return issues
+
+    expected_categories = {"input", "diagnostic", "report", "figure"}
+    seen_categories = set()
+    seen_names: set[tuple[str, str]] = set()
+    for idx, row in enumerate(rows, start=2):
+        category = row["category"].strip()
+        name = row["name"].strip()
+        path_text = row["path"].strip()
+        claim_boundary = row["claim_boundary"].strip()
+        seen_categories.add(category)
+        key = (category, name)
+        if category not in expected_categories:
+            issues.append(f"row {idx} has unknown category: {category}")
+        if not name:
+            issues.append(f"row {idx} has empty name")
+        if key in seen_names:
+            issues.append(f"row {idx} duplicates artifact key: {category}/{name}")
+        seen_names.add(key)
+        if not path_text:
+            issues.append(f"row {idx} has empty path")
+            continue
+        artifact_path = Path(path_text)
+        if not artifact_path.is_absolute():
+            artifact_path = root / artifact_path
+        if not artifact_path.exists():
+            issues.append(f"row {idx} artifact does not exist: {path_text}")
+        if not claim_boundary:
+            issues.append(f"row {idx} has empty claim_boundary")
+
+    missing_categories = expected_categories.difference(seen_categories)
+    if missing_categories:
+        issues.append(f"manifest missing artifact categories: {', '.join(sorted(missing_categories))}")
+    return issues
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -248,6 +315,13 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_validate_sibling_sources(args)
     if args.command == "copy-sibling-outputs":
         return _cmd_copy_sibling_outputs(args)
+    if args.command == "validate-mechanism-package":
+        return _print_issues(
+            _validate_mechanism_package_manifest(
+                manifest_path=args.manifest,
+                project_root=args.project_root,
+            )
+        )
     if args.command == "build-h8-panel":
         panel = build_h8_bank_group_panel(
             args.input,

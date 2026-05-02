@@ -79,6 +79,7 @@ bankcap write-go-no-go-report
 bankcap write-mechanism-memo
 bankcap write-mechanism-figures
 bankcap write-mechanism-package
+bankcap validate-mechanism-package
 ```
 
 `run-diagnostics` also writes `relative_bill_share_cutoff_sensitivity.csv`, a descriptive robustness
@@ -87,3 +88,4 @@ screen for nearby relative bill-share cutoffs, plus `event_window_summary.csv` a
 
 `write-mechanism-package` is a post-panel convenience wrapper. It reruns diagnostics and writes the
 go/no-go report, mechanism memo, SVG figures, and a package manifest from the same panel.
+`validate-mechanism-package` checks the manifest schema, artifact paths, and claim-boundary notes.

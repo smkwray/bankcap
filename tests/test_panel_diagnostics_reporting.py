@@ -136,3 +136,14 @@ def test_cli_write_mechanism_package(tmp_path):
     assert "claim_boundary" in manifest.read_text()
     assert (figures_dir / "h8_ratio_trends.svg").exists()
     assert (figures_dir / "relative_bill_share_contrasts.svg").exists()
+    assert main(["validate-mechanism-package", "--manifest", str(manifest), "--project-root", str(tmp_path)]) == 0
+
+
+def test_cli_validate_mechanism_package_rejects_missing_artifact(tmp_path):
+    manifest = tmp_path / "manifest.csv"
+    manifest.write_text(
+        "category,name,path,claim_boundary\n"
+        "input,analysis_panel,missing.csv,H.8 mechanism context only\n"
+    )
+    rc = main(["validate-mechanism-package", "--manifest", str(manifest), "--project-root", str(tmp_path)])
+    assert rc == 1
