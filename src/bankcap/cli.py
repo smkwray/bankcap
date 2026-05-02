@@ -290,12 +290,25 @@ def _validate_mechanism_package_manifest(
             artifact_path = root / artifact_path
         if not artifact_path.exists():
             issues.append(f"row {idx} artifact does not exist: {path_text}")
+        elif category in {"input", "diagnostic"}:
+            with artifact_path.open(newline="", encoding="utf-8") as artifact_handle:
+                artifact_reader = csv.reader(artifact_handle)
+                header = next(artifact_reader, [])
+                first_row = next(artifact_reader, [])
+            if not header:
+                issues.append(f"row {idx} CSV artifact has no header: {path_text}")
+            if not first_row:
+                issues.append(f"row {idx} CSV artifact has no data rows: {path_text}")
         elif category == "report":
             text = artifact_path.read_text(encoding="utf-8").lower()
             if "claim boundary" not in text and "interpretation boundary" not in text:
                 issues.append(f"row {idx} report is missing claim/interpretation boundary: {path_text}")
             if "not bank-level" not in text and "does not identify" not in text:
                 issues.append(f"row {idx} report is missing bank-level limitation language: {path_text}")
+        elif category == "figure":
+            text = artifact_path.read_text(encoding="utf-8").strip().lower()
+            if not text.startswith("<svg") or "</svg>" not in text:
+                issues.append(f"row {idx} figure is not a complete SVG: {path_text}")
         if not claim_boundary:
             issues.append(f"row {idx} has empty claim_boundary")
 
