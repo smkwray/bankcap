@@ -14,6 +14,7 @@ from bankcap.contracts import (
     validate_contract,
 )
 from bankcap.diagnostics import run_first_pass_diagnostics
+from bankcap.figures import write_mechanism_figures
 from bankcap.h8 import build_h8_bank_group_panel
 from bankcap.h8_ddp import build_target_group_h8_input, download_target_group_packages
 from bankcap.panel import build_analysis_panel
@@ -94,6 +95,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--panel", default="data/derived/bankcap_analysis_panel.csv")
     p.add_argument("--diagnostics-dir", default="output/diagnostics")
     p.add_argument("--output", default="output/reports/h8_mechanism_screen_memo.md")
+
+    p = sub.add_parser("write-mechanism-figures", help="Write H.8 mechanism-screen SVG figures.")
+    p.add_argument("--panel", default="data/derived/bankcap_analysis_panel.csv")
+    p.add_argument("--diagnostics-dir", default="output/diagnostics")
+    p.add_argument("--output-dir", default="output/figures")
 
     return parser
 
@@ -228,6 +234,16 @@ def main(argv: list[str] | None = None) -> int:
             output_path=args.output,
         )
         print(f"Wrote memo: {memo}")
+        return 0
+    if args.command == "write-mechanism-figures":
+        outputs = write_mechanism_figures(
+            panel_path=args.panel,
+            diagnostics_dir=args.diagnostics_dir,
+            output_dir=args.output_dir,
+        )
+        print("Wrote figures:")
+        for name, path in outputs.items():
+            print(f"- {name}: {path}")
         return 0
 
     parser.print_help()

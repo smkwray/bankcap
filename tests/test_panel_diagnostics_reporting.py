@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from bankcap.diagnostics import run_first_pass_diagnostics
+from bankcap.figures import write_mechanism_figures
 from bankcap.h8 import build_h8_bank_group_panel
 from bankcap.panel import build_analysis_panel
 from bankcap.reporting import write_go_no_go_report, write_mechanism_memo
@@ -71,3 +72,19 @@ def test_write_mechanism_memo(tmp_path):
     assert "Relative high-bill and low-bill" in text
     assert "High-minus-low stability" in text
     assert "Interpretation boundary" in text
+
+
+def test_write_mechanism_figures(tmp_path):
+    _, panel_path = _make_panel(tmp_path)
+    diag_dir = tmp_path / "diagnostics"
+    run_first_pass_diagnostics(panel_path, diag_dir, event_window=1)
+    outputs = write_mechanism_figures(
+        panel_path=panel_path,
+        diagnostics_dir=diag_dir,
+        output_dir=tmp_path / "figures",
+    )
+    assert set(outputs) == {"ratio_trends", "relative_contrasts"}
+    for path in outputs.values():
+        text = path.read_text()
+        assert text.startswith("<svg")
+        assert "</svg>" in text
