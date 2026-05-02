@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from bankcap.diagnostics import target_common_panel, tga_complete_target_panel
 from bankcap.io import ensure_parent, read_csv
 
 CLAIM_BOUNDARY_TEXT = """\
@@ -25,12 +26,7 @@ TARGET_H8_GROUPS = {
 
 
 def _target_common_panel(panel: pd.DataFrame) -> pd.DataFrame:
-    if "period" not in panel.columns or "bank_group" not in panel.columns:
-        return panel.iloc[0:0].copy()
-    target = panel.loc[panel["bank_group"].astype(str).isin(TARGET_H8_GROUPS)].copy()
-    group_counts = target.groupby("period")["bank_group"].nunique()
-    common_periods = group_counts[group_counts == len(TARGET_H8_GROUPS)].index
-    return target.loc[target["period"].isin(common_periods)].copy()
+    return target_common_panel(panel)
 
 
 def _diagnostic_signal(panel: pd.DataFrame) -> tuple[str, list[str]]:
@@ -134,4 +130,183 @@ pre-trend specification.
    variation that is not solely a calendar-regime artifact.
 """
     out.write_text(report, encoding="utf-8")
+    return out
+
+
+def _fmt_number(value: object, digits: int = 2) -> str:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return "NA"
+    if pd.isna(numeric):
+        return "NA"
+    return f"{numeric:.{digits}f}"
+
+
+def _response_lines(response: pd.DataFrame, *, max_rows: int | None = None) -> list[str]:
+    if response.empty:
+        return ["- No response table is available."]
+    lines = []
+    ordered = response.sort_values(["bank_group", "treasury_context_bucket"])
+    if max_rows is not None:
+        ordered = ordered.head(max_rows)
+    for _, row in ordered.iterrows():
+        lines.append(
+            "- "
+            f"`{row['bank_group']}` / `{row['treasury_context_bucket']}`: "
+            f"n={int(row['n_rows'])}, "
+            f"d_securities={_fmt_number(row.get('d_securities_usd_millions'), 1)}, "
+            f"d_deposits={_fmt_number(row.get('d_deposits_usd_millions'), 1)}, "
+            f"d_loans={_fmt_number(row.get('d_loans_usd_millions'), 1)}, "
+            f"d_cash={_fmt_number(row.get('d_cash_assets_usd_millions'), 1)}"
+        )
+    return lines
+
+
+def _sample_warning(sample_summary: pd.DataFrame) -> str:
+    if sample_summary.empty:
+        return "No sample summary was available; do not interpret response differences."
+    common = sample_summary.loc[
+        (sample_summary["sample"] == "common_target_periods")
+        & (sample_summary["bank_group"] == "all_target_groups")
+    ]
+    if common.empty:
+        return "No common target-group sample is available; do not interpret response differences."
+    row = common.iloc[0]
+    coupon_rows = int(row.get("coupon_heavy_rows", 0))
+    context_share = float(row.get("context_complete_share", 0.0))
+    warnings = []
+    if coupon_rows < 12:
+        warnings.append(
+            f"Coupon-heavy support is too thin in the common target-group sample "
+            f"({coupon_rows} rows), so bill-versus-coupon contrasts are not stable."
+        )
+    if context_share < 0.75:
+        warnings.append(
+            f"Context completeness is {context_share:.2f}, below the full-go threshold; "
+            "TGA-complete diagnostics should be read as a later-sample screen."
+        )
+    if not warnings:
+        warnings.append("Common target-group coverage is adequate for a scoped mechanism memo.")
+    return " ".join(warnings)
+
+
+def write_mechanism_memo(
+    *,
+    panel_path: str | Path,
+    diagnostics_dir: str | Path,
+    output_path: str | Path,
+) -> Path:
+    """Write a guarded H.8 mechanism-screen memo from generated diagnostics."""
+
+    panel = read_csv(panel_path)
+    diag = Path(diagnostics_dir)
+    sample_summary = read_csv(diag / "sample_summary.csv") if (diag / "sample_summary.csv").exists() else pd.DataFrame()
+    response = (
+        read_csv(diag / "bank_group_response_table.csv")
+        if (diag / "bank_group_response_table.csv").exists()
+        else pd.DataFrame()
+    )
+    common_response = (
+        read_csv(diag / "common_target_response_table.csv")
+        if (diag / "common_target_response_table.csv").exists()
+        else pd.DataFrame()
+    )
+    tga_response = (
+        read_csv(diag / "tga_complete_response_table.csv")
+        if (diag / "tga_complete_response_table.csv").exists()
+        else pd.DataFrame()
+    )
+    trends = read_csv(diag / "bank_group_trends.csv") if (diag / "bank_group_trends.csv").exists() else pd.DataFrame()
+    guarded = (
+        read_csv(diag / "guarded_regressions.csv")
+        if (diag / "guarded_regressions.csv").exists()
+        else pd.DataFrame()
+    )
+    recommendation, reasons = _diagnostic_signal(panel)
+    out = ensure_parent(output_path)
+
+    common = _target_common_panel(panel)
+    tga_complete = tga_complete_target_panel(panel)
+    common_period_text = "none"
+    if len(common):
+        common_period_text = f"{common['period'].min()} to {common['period'].max()}"
+    tga_period_text = "none"
+    if len(tga_complete):
+        tga_period_text = f"{tga_complete['period'].min()} to {tga_complete['period'].max()}"
+
+    trend_lines = []
+    for _, row in trends.sort_values("bank_group").iterrows() if not trends.empty else []:
+        trend_lines.append(
+            "- "
+            f"`{row['bank_group']}`: {int(row['n_rows'])} rows, "
+            f"{row['first_period']} to {row['last_period']}; "
+            f"last securities/deposits={_fmt_number(row.get('last_securities_deposits_ratio'), 3)}, "
+            f"last cash/deposits={_fmt_number(row.get('last_cash_deposits_ratio'), 3)}, "
+            f"last loans/deposits={_fmt_number(row.get('last_loans_deposits_ratio'), 3)}"
+        )
+
+    strongest = pd.DataFrame()
+    if not guarded.empty and "r_squared" in guarded.columns:
+        strongest = guarded.sort_values("r_squared", ascending=False).head(6)
+    guarded_lines = []
+    for _, row in strongest.iterrows():
+        guarded_lines.append(
+            "- "
+            f"`{row['bank_group']}` `{row['outcome_change']}`: "
+            f"bill-share coefficient={_fmt_number(row.get('bill_share_coef'), 3)}, "
+            f"R2={_fmt_number(row.get('r_squared'), 4)}, n={int(row.get('n_obs', 0))}"
+        )
+    if not guarded_lines:
+        guarded_lines = ["- No guarded regression table is available."]
+
+    memo = f"""# H.8 Mechanism-Screen Memo
+
+## Bottom line
+
+{recommendation}. {_sample_warning(sample_summary)}
+
+## Gate checks
+
+{chr(10).join(f"- {reason}" for reason in reasons)}
+- common target-group sample: {common_period_text}
+
+## Balance-sheet coverage
+
+{chr(10).join(trend_lines) if trend_lines else "- No trend table is available."}
+
+## Bill-heavy and coupon-heavy response support
+
+Full target-group rows:
+
+{chr(10).join(_response_lines(response))}
+
+Common target-group sample:
+
+{chr(10).join(_response_lines(common_response))}
+
+TGA-complete common target-group sample ({tga_period_text}):
+
+{chr(10).join(_response_lines(tga_response))}
+
+## Guarded bill-share screens
+
+{chr(10).join(guarded_lines)}
+
+## Interpretation boundary
+
+This memo is descriptive mechanism screening. It does not identify individual-bank absorption,
+bank-level duration exposure, causal Treasury absorption, or merger-adjusted bank behavior. The H.8
+securities measure is Treasury-and-agency securities. A bank-level memo should come before any Call
+Report or FR Y-9C ingestion.
+
+## Recommended next branch
+
+1. Treat coupon-heavy contrasts as unsupported unless the issuance context definition is revised and
+   produces meaningful coupon-heavy support.
+2. Inspect the TGA-complete rows as a later-sample mechanism check, not a full historical result.
+3. If the pattern remains stable after a defensible context definition, draft a scoped bank-level design memo;
+   otherwise keep `bankcap` as an H.8 mechanism-context project.
+"""
+    out.write_text(memo, encoding="utf-8")
     return out

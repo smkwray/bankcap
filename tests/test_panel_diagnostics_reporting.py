@@ -3,7 +3,7 @@ from pathlib import Path
 from bankcap.diagnostics import run_first_pass_diagnostics
 from bankcap.h8 import build_h8_bank_group_panel
 from bankcap.panel import build_analysis_panel
-from bankcap.reporting import write_go_no_go_report
+from bankcap.reporting import write_go_no_go_report, write_mechanism_memo
 from bankcap.treasury_context import build_treasury_context
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
@@ -34,6 +34,9 @@ def test_build_analysis_panel_and_diagnostics(tmp_path):
     for path in outputs.values():
         assert path.exists()
     assert outputs["bank_group_response_table"].read_text().startswith("bank_group")
+    assert outputs["common_target_response_table"].exists()
+    assert outputs["tga_complete_response_table"].exists()
+    assert outputs["sample_summary"].read_text().startswith("sample")
 
 
 def test_write_go_no_go_report(tmp_path):
@@ -48,3 +51,17 @@ def test_write_go_no_go_report(tmp_path):
     text = report.read_text()
     assert "Claim boundary" in text
     assert "NO-GO" in text or "GO" in text
+
+
+def test_write_mechanism_memo(tmp_path):
+    _, panel_path = _make_panel(tmp_path)
+    diag_dir = tmp_path / "diagnostics"
+    run_first_pass_diagnostics(panel_path, diag_dir, event_window=1)
+    memo = write_mechanism_memo(
+        panel_path=panel_path,
+        diagnostics_dir=diag_dir,
+        output_path=tmp_path / "memo.md",
+    )
+    text = memo.read_text()
+    assert "H.8 Mechanism-Screen Memo" in text
+    assert "Interpretation boundary" in text

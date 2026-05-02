@@ -72,4 +72,5 @@ bankcap build-treasury-context \
 bankcap build-analysis-panel
 bankcap run-diagnostics
 bankcap write-go-no-go-report
+bankcap write-mechanism-memo
 ```

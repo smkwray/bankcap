@@ -17,7 +17,7 @@ from bankcap.diagnostics import run_first_pass_diagnostics
 from bankcap.h8 import build_h8_bank_group_panel
 from bankcap.h8_ddp import build_target_group_h8_input, download_target_group_packages
 from bankcap.panel import build_analysis_panel
-from bankcap.reporting import write_go_no_go_report
+from bankcap.reporting import write_go_no_go_report, write_mechanism_memo
 from bankcap.treasury_context import build_treasury_context
 
 
@@ -89,6 +89,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--panel", default="data/derived/bankcap_analysis_panel.csv")
     p.add_argument("--diagnostics-dir", default="output/diagnostics")
     p.add_argument("--output", default="output/reports/h8_go_no_go_report.md")
+
+    p = sub.add_parser("write-mechanism-memo", help="Write a guarded H.8 mechanism-screen memo.")
+    p.add_argument("--panel", default="data/derived/bankcap_analysis_panel.csv")
+    p.add_argument("--diagnostics-dir", default="output/diagnostics")
+    p.add_argument("--output", default="output/reports/h8_mechanism_screen_memo.md")
 
     return parser
 
@@ -215,6 +220,14 @@ def main(argv: list[str] | None = None) -> int:
             output_path=args.output,
         )
         print(f"Wrote report: {report}")
+        return 0
+    if args.command == "write-mechanism-memo":
+        memo = write_mechanism_memo(
+            panel_path=args.panel,
+            diagnostics_dir=args.diagnostics_dir,
+            output_path=args.output,
+        )
+        print(f"Wrote memo: {memo}")
         return 0
 
     parser.print_help()

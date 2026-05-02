@@ -35,6 +35,12 @@ EVENT_FLAGS = [
     "high_rate_regime",
 ]
 
+TARGET_H8_GROUPS = {
+    "large_domestic_banks",
+    "small_domestic_banks",
+    "foreign_related_institutions",
+}
+
 
 def bank_group_trends(panel: pd.DataFrame) -> pd.DataFrame:
     """Summarize levels and sample coverage by H.8 bank group."""
@@ -63,6 +69,17 @@ def bank_group_trends(panel: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def target_common_panel(panel: pd.DataFrame) -> pd.DataFrame:
+    """Return periods where all target H.8 bank groups are observed."""
+
+    if "period" not in panel.columns or "bank_group" not in panel.columns:
+        return panel.iloc[0:0].copy()
+    target = panel.loc[panel["bank_group"].astype(str).isin(TARGET_H8_GROUPS)].copy()
+    group_counts = target.groupby("period")["bank_group"].nunique()
+    common_periods = group_counts[group_counts == len(TARGET_H8_GROUPS)].index
+    return target.loc[target["period"].isin(common_periods)].copy()
+
+
 def context_bucket(panel: pd.DataFrame) -> pd.Series:
     """Return bill-heavy/coupon-heavy/mixed buckets for each row."""
 
@@ -72,6 +89,73 @@ def context_bucket(panel: pd.DataFrame) -> pd.Series:
     bucket.loc[bill] = "bill_heavy"
     bucket.loc[coupon] = "coupon_heavy"
     return bucket
+
+
+def sample_summary_table(panel: pd.DataFrame) -> pd.DataFrame:
+    """Summarize target-group coverage and context-bucket support."""
+
+    frames = {
+        "all_target_rows": panel.loc[
+            panel.get("bank_group", pd.Series("", index=panel.index)).astype(str).isin(TARGET_H8_GROUPS)
+        ],
+        "common_target_periods": target_common_panel(panel),
+    }
+    rows: list[dict[str, object]] = []
+    context_cols = [c for c in CONTEXT_NUMERIC_COLUMNS if c in panel.columns]
+    for sample_name, sample in frames.items():
+        if sample.empty:
+            rows.append(
+                {
+                    "sample": sample_name,
+                    "bank_group": "all_target_groups",
+                    "n_rows": 0,
+                    "n_periods": 0,
+                    "first_period": "",
+                    "last_period": "",
+                    "bill_heavy_rows": 0,
+                    "coupon_heavy_rows": 0,
+                    "mixed_or_unclassified_rows": 0,
+                    "context_complete_share": 0.0,
+                }
+            )
+            continue
+        work = sample.copy()
+        work["treasury_context_bucket"] = context_bucket(work)
+        for group_name, gdf in [("all_target_groups", work), *list(work.groupby("bank_group"))]:
+            row: dict[str, object] = {
+                "sample": sample_name,
+                "bank_group": group_name,
+                "n_rows": len(gdf),
+                "n_periods": gdf["period"].nunique(),
+                "first_period": gdf["period"].min(),
+                "last_period": gdf["period"].max(),
+                "bill_heavy_rows": int(gdf["treasury_context_bucket"].eq("bill_heavy").sum()),
+                "coupon_heavy_rows": int(gdf["treasury_context_bucket"].eq("coupon_heavy").sum()),
+                "mixed_or_unclassified_rows": int(
+                    gdf["treasury_context_bucket"].eq("mixed_or_unclassified").sum()
+                ),
+                "context_complete_share": float(
+                    gdf.get("is_context_complete", pd.Series(False, index=gdf.index)).mean()
+                ),
+            }
+            for column in context_cols:
+                row[f"{column}_nonmissing"] = int(pd.to_numeric(gdf[column], errors="coerce").notna().sum())
+            rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def tga_complete_target_panel(panel: pd.DataFrame) -> pd.DataFrame:
+    """Return the common target-group sample with complete context rows."""
+
+    common = target_common_panel(panel)
+    if common.empty:
+        return common
+    if "is_context_complete" in common.columns:
+        return common.loc[common["is_context_complete"].fillna(False).astype(bool)].copy()
+    required = [c for c in CONTEXT_NUMERIC_COLUMNS if c in common.columns]
+    if not required:
+        return common.iloc[0:0].copy()
+    return common.loc[common[required].notna().all(axis=1)].copy()
 
 
 def bank_group_response_table(panel: pd.DataFrame) -> pd.DataFrame:
@@ -209,14 +293,20 @@ def run_first_pass_diagnostics(
     out_dir.mkdir(parents=True, exist_ok=True)
 
     outputs = {
+        "sample_summary": out_dir / "sample_summary.csv",
         "bank_group_trends": out_dir / "bank_group_trends.csv",
         "bank_group_response_table": out_dir / "bank_group_response_table.csv",
+        "common_target_response_table": out_dir / "common_target_response_table.csv",
+        "tga_complete_response_table": out_dir / "tga_complete_response_table.csv",
         "correlations": out_dir / "correlations.csv",
         "guarded_regressions": out_dir / "guarded_regressions.csv",
         "event_windows": out_dir / "event_windows.csv",
     }
+    write_csv(sample_summary_table(panel), outputs["sample_summary"])
     write_csv(bank_group_trends(panel), outputs["bank_group_trends"])
     write_csv(bank_group_response_table(panel), outputs["bank_group_response_table"])
+    write_csv(bank_group_response_table(target_common_panel(panel)), outputs["common_target_response_table"])
+    write_csv(bank_group_response_table(tga_complete_target_panel(panel)), outputs["tga_complete_response_table"])
     write_csv(correlation_table(panel), outputs["correlations"])
     write_csv(guarded_regression_table(panel), outputs["guarded_regressions"])
     write_csv(event_window_table(panel, window=event_window), outputs["event_windows"])

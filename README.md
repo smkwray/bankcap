@@ -128,6 +128,11 @@ bankcap write-go-no-go-report \
   --panel data/derived/bankcap_analysis_panel.csv \
   --diagnostics-dir output/diagnostics \
   --output output/reports/h8_go_no_go_report.md
+
+bankcap write-mechanism-memo \
+  --panel data/derived/bankcap_analysis_panel.csv \
+  --diagnostics-dir output/diagnostics \
+  --output output/reports/h8_mechanism_screen_memo.md
 ```
 
 The H.8 target-group workflow downloads Federal Reserve DDP packages into ignored `data/raw/`,
