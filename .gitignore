@@ -41,3 +41,20 @@ docs/source_context/
 *.zip
 *.tar
 *.tar.gz
+
+# Private local configuration
+.env.*
+.private-denylist
+.*-private-denylist
+AGENTS.md
+CLAUDE.md
+.codex/
+.claude/
+.cursor/
+.worktrees/
+/.env.example
+/docs/implementation_plan.md
+
+/build/
+
+/dist/
