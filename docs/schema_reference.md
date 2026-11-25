@@ -51,5 +51,4 @@ Required top-level keys:
 - `event_window_inventory`;
 - `bank_level_ingestion`.
 
-The summary must keep `bank_level_ingestion.status` equal to `blocked` unless a separate design memo
-changes the project scope.
+`bank_level_ingestion.status` is `blocked`: the pipeline does not ingest bank-level data.
