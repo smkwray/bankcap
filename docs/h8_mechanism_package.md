@@ -1,9 +1,8 @@
 # H.8 mechanism package
 
-This repository's completed Project 5 deliverable is the H.8 bank-group mechanism screen for
-Treasury absorption. The package is designed to answer whether bank-group balance sheets move
-differentially around Treasury financing and liquidity-plumbing contexts before any bank-level data
-cost is incurred.
+This package is the H.8 bank-group mechanism screen for Treasury absorption. It is designed to
+answer whether bank-group balance sheets move differentially around Treasury financing and
+liquidity-plumbing contexts before any bank-level data cost is incurred.
 
 ## Final project status
 
